@@ -1,0 +1,27 @@
+{
+  "name": "logictales-backend",
+  "version": "1.0.0",
+  "description": "LogicTales AI Pipeline Backend",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@hono/node-server": "^1.19.7",
+    "@supabase/supabase-js": "^2.87.1",
+    "cloudinary": "^2.8.0",
+    "dotenv": "^17.2.3",
+    "hono": "^4.10.8"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

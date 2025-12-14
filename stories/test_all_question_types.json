@@ -1,0 +1,63 @@
+{
+  "title": "Test All Question Types",
+  "initial_variables": {
+    "score": 0
+  },
+  "pages": [
+    {
+      "id": 1,
+      "question_type": "binary",
+      "image_path": "",
+      "question_text": "Is 5 greater than 3?",
+      "hint_text": "Think about which number is bigger",
+      "variable_name": "score",
+      "variable_value": 5,
+      "operator": ">",
+      "target_value": 3,
+      "true_destination_id": 2,
+      "false_destination_id": 0,
+      "choice_labels": ["Yes", "No"]
+    },
+    {
+      "id": 2,
+      "question_type": "text",
+      "image_path": "",
+      "question_text": "What is the capital of France?",
+      "hint_text": "It starts with P",
+      "correct_answer": "Paris",
+      "true_destination_id": 3,
+      "false_destination_id": 2,
+      "variable_name": "score",
+      "variable_value": 0,
+      "operator": ">",
+      "target_value": 0
+    },
+    {
+      "id": 3,
+      "question_type": "multi",
+      "image_path": "",
+      "question_text": "Answer all questions correctly:",
+      "hint_text": "Basic math and colors",
+      "questions": [
+        {
+          "question_text": "What is 2 + 2?",
+          "correct_answer": "4"
+        },
+        {
+          "question_text": "What color is the sky?",
+          "correct_answer": "blue"
+        },
+        {
+          "question_text": "What is 10 - 7?",
+          "correct_answer": "3"
+        }
+      ],
+      "true_destination_id": 0,
+      "false_destination_id": 3,
+      "variable_name": "score",
+      "variable_value": 0,
+      "operator": ">",
+      "target_value": 0
+    }
+  ]
+}

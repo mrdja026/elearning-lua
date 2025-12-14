@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(openspec validate:*)",
+      "Bash(ls:*)",
+      "Bash(openspec archive add-creator-studio:*)",
+      "Bash(openspec list:*)",
+      "Bash(openspec archive:*)",
+      "Bash(dir \"C:\\Users\\Mrdjan\\Documents\\workspace\\eai-learning\")",
+      "Bash(npx tsc:*)",
+      "Bash(findstr:*)",
+      "Bash(npx openspec:*)"
+    ]
+  },
+  "spinnerTipsEnabled": true
+}

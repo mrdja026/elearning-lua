@@ -1,0 +1,60 @@
+{
+  "title": "The Apple Adventure",
+  "initial_variables": {
+    "apples": 5
+  },
+  "pages": [
+    {
+      "id": 1,
+      "image_path": "",
+      "question_text": "You have 5 apples. Is 5 greater than 3?",
+      "hint_text": "Think about which number is bigger!",
+      "variable_name": "apples",
+      "variable_value": 5,
+      "operator": ">",
+      "target_value": 3,
+      "true_destination_id": 2,
+      "false_destination_id": 4,
+      "choice_labels": ["Yes", "No"]
+    },
+    {
+      "id": 2,
+      "image_path": "",
+      "question_text": "Great! Now you eat 2 apples. You have 3 left. Is 3 equal to 3?",
+      "hint_text": "Are the numbers the same?",
+      "variable_name": "apples",
+      "variable_value": 3,
+      "operator": "=",
+      "target_value": 3,
+      "true_destination_id": 3,
+      "false_destination_id": 4,
+      "choice_labels": ["Yes", "No"]
+    },
+    {
+      "id": 3,
+      "image_path": "",
+      "question_text": "You give 1 apple to a friend. Now you have 2. Is 2 less than 5?",
+      "hint_text": "Compare the numbers carefully.",
+      "variable_name": "apples",
+      "variable_value": 2,
+      "operator": "<",
+      "target_value": 5,
+      "true_destination_id": 0,
+      "false_destination_id": 4,
+      "choice_labels": ["Yes", "No"]
+    },
+    {
+      "id": 4,
+      "image_path": "",
+      "question_text": "Oops! That wasn't quite right. Would you like to try again?",
+      "hint_text": "Press R to restart the story.",
+      "variable_name": "apples",
+      "variable_value": 0,
+      "operator": "=",
+      "target_value": 0,
+      "true_destination_id": 0,
+      "false_destination_id": 0,
+      "choice_labels": ["End", "End"]
+    }
+  ]
+}

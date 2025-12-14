@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Build output
+backend/dist/
+*.love
+
+# Environment files
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+nul
+
+# Logs
+*.log
+npm-debug.log*
+
+# Love2D
+*.zip
+
+# Temp files
+*.tmp
+*.temp
+*.bak
+
+# Test coverage
+coverage/
+
+# TypeScript cache
+*.tsbuildinfo
