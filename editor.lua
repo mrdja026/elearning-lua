@@ -27,7 +27,9 @@ local state = {
     -- Image generation state
     isGenerating = false,
     imageThread = nil,
-    generationError = nil
+    generationError = nil,
+    -- Storybook UI state
+    storySettingsExpanded = false
 }
 
 function editor.init()
@@ -94,22 +96,25 @@ function editor.update(dt)
 end
 
 function editor.draw()
-    editor.drawFilePanel()
-    editor.drawStoryPanel()
-    editor.drawPageListPanel()
-    editor.drawPageEditorPanel()
+    -- New storybook layout: Thumbnails | Preview (center) | Control Deck
+    editor.drawPageThumbnails()      -- Left sidebar
+    editor.drawStorySettingsHeader() -- Top of right sidebar (collapsible)
+    editor.drawControlDeck()         -- Right sidebar (below story settings)
+    editor.drawDreamItButton()       -- Bottom bar
 
     if state.showLoadDialog then
         editor.drawLoadDialog()
     end
 
+    -- Toast-style message
     if state.message then
-        local winH = love.graphics.getHeight()
-        local msgY = winH - 45
-        love.graphics.setColor(0.2, 0.6, 0.3, 0.9)
-        love.graphics.rectangle("fill", 10, msgY, 400, 30, 5)
+        local layout = Layout.getConfigLayout()
+        local msgX = layout.previewPanel.x + 20
+        local msgY = layout.previewPanel.y + layout.previewPanel.height - 50
+        love.graphics.setColor(0.2, 0.6, 0.3, 0.95)
+        love.graphics.rectangle("fill", msgX, msgY, 350, 35, 8)
         love.graphics.setColor(1, 1, 1)
-        love.graphics.print(state.message, 20, msgY + 8)
+        love.graphics.print(state.message, msgX + 15, msgY + 9)
     end
 end
 
@@ -431,6 +436,470 @@ function editor.drawLoadDialog()
 
     Slab.EndWindow()
 end
+
+-- ============================================
+-- NEW STORYBOOK LAYOUT PANELS
+-- ============================================
+
+-- Page thumbnails panel (left sidebar) - Custom drawn, not Slab
+function editor.drawPageThumbnails()
+    local layout = Layout.getConfigLayout()
+    local panel = layout.thumbnailsPanel
+
+    -- Draw panel background
+    love.graphics.setColor(Tokens.COLORS.panel_dark_transparent)
+    love.graphics.rectangle("fill", panel.x, panel.y, panel.width, panel.height, 6)
+
+    -- Draw header
+    love.graphics.setColor(0.2, 0.2, 0.25, 1)
+    love.graphics.rectangle("fill", panel.x, panel.y, panel.width, 30, 6)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("Pages", panel.x + 10, panel.y + 7)
+
+    -- Thumbnail dimensions
+    local thumbW = panel.width - 20
+    local thumbH = 60
+    local thumbGap = 8
+    local startY = panel.y + 40
+
+    -- Draw page thumbnails
+    for i, page in ipairs(state.story.pages) do
+        local thumbX = panel.x + 10
+        local thumbY = startY + (i - 1) * (thumbH + thumbGap)
+
+        -- Check if thumbnail is visible in panel
+        if thumbY + thumbH > panel.y + panel.height - 60 then
+            break -- Stop drawing if we run out of space
+        end
+
+        local isSelected = (i == state.selectedPageIndex)
+
+        -- Thumbnail background
+        if isSelected then
+            love.graphics.setColor(0.3, 0.5, 0.7, 1)
+        else
+            love.graphics.setColor(0.25, 0.25, 0.3, 1)
+        end
+        love.graphics.rectangle("fill", thumbX, thumbY, thumbW, thumbH, 4)
+
+        -- Thumbnail border
+        if isSelected then
+            love.graphics.setColor(0.5, 0.7, 0.9, 1)
+        else
+            love.graphics.setColor(0.4, 0.4, 0.45, 1)
+        end
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", thumbX, thumbY, thumbW, thumbH, 4)
+        love.graphics.setLineWidth(1)
+
+        -- Page label centered
+        love.graphics.setColor(1, 1, 1, 1)
+        local label = "Page " .. page.id
+        local font = love.graphics.getFont()
+        local labelW = font:getWidth(label)
+        love.graphics.print(label, thumbX + (thumbW - labelW) / 2, thumbY + (thumbH - 16) / 2)
+    end
+
+    -- Bottom buttons area
+    local btnY = panel.y + panel.height - 45
+    local btnW = 40
+    local btnH = 35
+    local btnGap = 5
+    local btnX = panel.x + 10
+
+    -- Store button positions for click handling
+    state.thumbnailButtons = {
+        add = {x = btnX, y = btnY, w = btnW, h = btnH},
+        remove = {x = btnX + btnW + btnGap, y = btnY, w = btnW, h = btnH},
+        load = {x = btnX + (btnW + btnGap) * 2, y = btnY, w = 50, h = btnH}
+    }
+
+    -- Draw + button
+    love.graphics.setColor(0.3, 0.5, 0.3, 1)
+    love.graphics.rectangle("fill", btnX, btnY, btnW, btnH, 4)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("+", btnX + 15, btnY + 8)
+
+    -- Draw - button
+    btnX = btnX + btnW + btnGap
+    love.graphics.setColor(0.5, 0.3, 0.3, 1)
+    love.graphics.rectangle("fill", btnX, btnY, btnW, btnH, 4)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("-", btnX + 15, btnY + 8)
+
+    -- Draw Load button
+    btnX = btnX + btnW + btnGap
+    love.graphics.setColor(0.3, 0.4, 0.5, 1)
+    love.graphics.rectangle("fill", btnX, btnY, 50, btnH, 4)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("Load", btnX + 10, btnY + 8)
+
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Handle clicks on custom thumbnail panel
+function editor.handleThumbnailClick(x, y)
+    local layout = Layout.getConfigLayout()
+    local panel = layout.thumbnailsPanel
+
+    -- Check if click is in panel
+    if x < panel.x or x > panel.x + panel.width then return false end
+    if y < panel.y or y > panel.y + panel.height then return false end
+
+    -- Check thumbnail clicks
+    local thumbW = panel.width - 20
+    local thumbH = 60
+    local thumbGap = 8
+    local startY = panel.y + 40
+
+    for i, page in ipairs(state.story.pages) do
+        local thumbX = panel.x + 10
+        local thumbY = startY + (i - 1) * (thumbH + thumbGap)
+
+        if thumbY + thumbH > panel.y + panel.height - 60 then
+            break
+        end
+
+        if x >= thumbX and x <= thumbX + thumbW and
+           y >= thumbY and y <= thumbY + thumbH then
+            state.selectedPageIndex = i
+            return true
+        end
+    end
+
+    -- Check button clicks
+    if state.thumbnailButtons then
+        local btns = state.thumbnailButtons
+        if x >= btns.add.x and x <= btns.add.x + btns.add.w and
+           y >= btns.add.y and y <= btns.add.y + btns.add.h then
+            editor.addPage()
+            return true
+        end
+        if x >= btns.remove.x and x <= btns.remove.x + btns.remove.w and
+           y >= btns.remove.y and y <= btns.remove.y + btns.remove.h then
+            editor.deletePage()
+            return true
+        end
+        if x >= btns.load.x and x <= btns.load.x + btns.load.w and
+           y >= btns.load.y and y <= btns.load.y + btns.load.h then
+            state.showLoadDialog = true
+            state.availableFiles = editor.getStoryFiles()
+            state.selectedFileIndex = 1
+            return true
+        end
+    end
+
+    return false
+end
+
+-- Story settings header (collapsible, at top of right sidebar)
+function editor.drawStorySettingsHeader()
+    local layout = Layout.getConfigLayout()
+    local header = layout.storySettingsHeader
+
+    local panelHeight = state.storySettingsExpanded and header.expandedHeight or header.collapsedHeight
+
+    Slab.BeginWindow("StorySettingsHeader", {
+        Title = "",
+        X = header.x,
+        Y = header.y,
+        W = header.width,
+        H = panelHeight,
+        AutoSizeWindow = false,
+        AllowMove = false,
+        AllowResize = false,
+        NoOutline = true,
+        BgColor = Tokens.COLORS.panel_medium_transparent
+    })
+
+    -- Collapsible header button
+    local headerIcon = state.storySettingsExpanded and "v" or ">"
+    local headerText = headerIcon .. " Story Settings"
+
+    if Slab.Button(headerText, {W = header.width - 20}) then
+        state.storySettingsExpanded = not state.storySettingsExpanded
+    end
+
+    if state.storySettingsExpanded then
+        local inputW = header.width - 30
+
+        Slab.Separator()
+
+        -- File operations row
+        if Slab.Button("New", {W = 55}) then
+            editor.newStory()
+        end
+        Slab.SameLine()
+        if Slab.Button("Save", {W = 55}) then
+            editor.saveStory()
+        end
+        Slab.SameLine()
+        if Slab.Button("Test", {W = 55}) then
+            -- Tab key handles this
+            editor.showMessage("Press Tab to test play")
+        end
+
+        Slab.Separator()
+
+        -- Story Title
+        Slab.Text("Title")
+        if Slab.Input("StoryTitleNew", {Text = state.story.title, W = inputW}) then
+            state.story.title = Slab.GetInputText()
+        end
+
+        -- Topic
+        state.story.topic = state.story.topic or ""
+        Slab.Text("Topic")
+        if Slab.Input("StoryTopicNew", {Text = state.story.topic, W = inputW}) then
+            state.story.topic = Slab.GetInputText()
+        end
+
+        -- General Image Prompt
+        state.story.general_image_prompt = state.story.general_image_prompt or ""
+        Slab.Text("Image Prompt")
+        if Slab.Input("GeneralImagePromptNew", {Text = state.story.general_image_prompt, W = inputW, MultiLine = true, H = 45}) then
+            state.story.general_image_prompt = Slab.GetInputText()
+        end
+    end
+
+    Slab.EndWindow()
+end
+
+-- Control deck panel (right sidebar with page editor fields)
+function editor.drawControlDeck()
+    local layout = Layout.getConfigLayout()
+    local panel = layout.controlDeckPanel
+
+    -- Adjust Y position based on story settings expansion
+    local header = layout.storySettingsHeader
+    local panelY = header.y + (state.storySettingsExpanded and header.expandedHeight or header.collapsedHeight) + 5
+    local panelH = layout.dreamItBar.y - panelY - 10
+
+    Slab.BeginWindow("ControlDeck", {
+        Title = "Page Editor",
+        X = panel.x,
+        Y = panelY,
+        W = panel.width,
+        H = panelH,
+        AutoSizeWindow = false,
+        AllowMove = false,
+        AllowResize = false,
+        NoOutline = true,
+        BgColor = Tokens.COLORS.panel_dark_transparent
+    })
+
+    local inputW = panel.width - 30
+    local page = state.story.pages[state.selectedPageIndex]
+
+    if not page then
+        Slab.Text("No page selected")
+        Slab.EndWindow()
+        return
+    end
+
+    -- Question Text
+    Slab.Text("Question")
+    if Slab.Input("QuestionTextNew", {Text = page.question_text, W = inputW, MultiLine = true, H = 50}) then
+        page.question_text = Slab.GetInputText()
+    end
+
+    -- Hint Text
+    Slab.Text("Hint")
+    if Slab.Input("HintTextNew", {Text = page.hint_text, W = inputW}) then
+        page.hint_text = Slab.GetInputText()
+    end
+
+    Slab.Separator()
+
+    -- Image Generation section
+    Slab.Text("Page Image")
+
+    -- Show current image path or placeholder
+    local imagePath = page.image_path or ""
+    if imagePath ~= "" then
+        Slab.Text(imagePath, {Color = {0.6, 0.8, 0.6, 1}})
+    else
+        Slab.Text("(no image)", {Color = {0.5, 0.5, 0.5, 1}})
+    end
+
+    -- Page-specific image prompt (optional, overrides story prompt)
+    page.image_prompt = page.image_prompt or ""
+    Slab.Text("Image Prompt (optional)")
+    if Slab.Input("PageImagePrompt", {Text = page.image_prompt, W = inputW, H = 40, MultiLine = true}) then
+        page.image_prompt = Slab.GetInputText()
+    end
+
+    -- Show which prompt will be used
+    local hasPagePrompt = page.image_prompt and page.image_prompt ~= ""
+    local hasStoryPrompt = state.story.general_image_prompt and state.story.general_image_prompt ~= ""
+
+    if hasPagePrompt then
+        Slab.Text("Using: Page prompt", {Color = {0.5, 0.7, 0.9, 1}})
+    elseif hasStoryPrompt then
+        Slab.Text("Using: Story prompt", {Color = {0.7, 0.7, 0.5, 1}})
+    else
+        Slab.Text("No prompt set!", {Color = {0.8, 0.4, 0.4, 1}})
+    end
+
+    -- Generate Image button
+    if state.isGenerating then
+        Slab.Text("Generating...", {Color = {0.8, 0.8, 0.3, 1}})
+    else
+        local canGenerate = hasPagePrompt or hasStoryPrompt
+        if Slab.Button("Generate Image", {W = inputW, Disabled = not canGenerate}) then
+            -- DEV_MODE: Use existing test image as placeholder
+            page.image_path = "pics/Gemini_Generated_Image_rod070rod070rod0.png"
+
+            -- If used story prompt, clear it to prevent accidental re-trigger
+            if not hasPagePrompt and hasStoryPrompt then
+                state.story.general_image_prompt = ""
+                editor.showMessage("Image generated! (Story prompt cleared)")
+            else
+                editor.showMessage("Image generated (DEV_MODE)")
+            end
+        end
+    end
+
+    Slab.Separator()
+
+    -- Question Type dropdown
+    Slab.Text("Question Type")
+    page.question_type = page.question_type or "yesno"
+    local typeIndex = 1
+    for i, t in ipairs(QUESTION_TYPES) do
+        if t == page.question_type then typeIndex = i break end
+    end
+
+    if Slab.BeginComboBox("QuestionTypeNew", {Selected = QUESTION_TYPE_LABELS[typeIndex], W = inputW}) then
+        for i, label in ipairs(QUESTION_TYPE_LABELS) do
+            if Slab.TextSelectable(label) then
+                page.question_type = QUESTION_TYPES[i]
+            end
+        end
+        Slab.EndComboBox()
+    end
+
+    Slab.Separator()
+
+    -- Question type specific fields
+    local halfW = math.floor((inputW - 10) / 2)
+
+    if page.question_type == "yesno" then
+        -- Correct answer checkbox
+        if page.correct_answer_is_yes == nil then
+            page.correct_answer_is_yes = true
+        end
+        if Slab.CheckBox(page.correct_answer_is_yes, "Correct = Yes") then
+            page.correct_answer_is_yes = not page.correct_answer_is_yes
+        end
+
+        -- Button Labels
+        page.choice_labels = page.choice_labels or {"Yes", "No"}
+        Slab.Text("Button Labels")
+        if Slab.Input("YesButtonNew", {Text = page.choice_labels[1], W = halfW}) then
+            page.choice_labels[1] = Slab.GetInputText()
+        end
+        Slab.SameLine()
+        if Slab.Input("NoButtonNew", {Text = page.choice_labels[2], W = halfW}) then
+            page.choice_labels[2] = Slab.GetInputText()
+        end
+
+    elseif page.question_type == "text" then
+        page.correct_answer = page.correct_answer or ""
+        Slab.Text("Correct Answer")
+        if Slab.Input("CorrectAnswerNew", {Text = page.correct_answer, W = inputW}) then
+            page.correct_answer = Slab.GetInputText()
+        end
+
+    elseif page.question_type == "multi" then
+        page.questions = page.questions or {}
+
+        Slab.Text("Sub-Questions (" .. #page.questions .. ")")
+
+        local toRemove = nil
+        for i, q in ipairs(page.questions) do
+            Slab.Text("Q" .. i)
+            if Slab.Input("SubQ" .. i .. "Text", {Text = q.question_text or "", W = inputW - 35}) then
+                q.question_text = Slab.GetInputText()
+            end
+            Slab.SameLine()
+            if Slab.Button("X##sub" .. i, {W = 25}) then
+                toRemove = i
+            end
+
+            if Slab.Input("SubQ" .. i .. "Ans", {Text = q.correct_answer or "", W = inputW}) then
+                q.correct_answer = Slab.GetInputText()
+            end
+        end
+
+        if toRemove then
+            table.remove(page.questions, toRemove)
+        end
+
+        if Slab.Button("+ Add", {W = 80}) then
+            table.insert(page.questions, {question_text = "", correct_answer = ""})
+        end
+    end
+
+    -- Navigation info
+    Slab.Separator()
+    Slab.Text("Navigation: Linear")
+
+    state.isDirty = true
+
+    Slab.EndWindow()
+end
+
+-- Dream It button bar (bottom)
+function editor.drawDreamItButton()
+    local layout = Layout.getConfigLayout()
+    local bar = layout.dreamItBar
+
+    Slab.BeginWindow("DreamItBar", {
+        Title = "",
+        X = bar.x,
+        Y = bar.y,
+        W = bar.width,
+        H = bar.height,
+        AutoSizeWindow = false,
+        AllowMove = false,
+        AllowResize = false,
+        NoOutline = true,
+        BgColor = Tokens.COLORS.panel_medium_transparent
+    })
+
+    -- Center the button
+    local btnX = (bar.width - bar.buttonWidth) / 2 - 10
+    Slab.SetCursorPos(btnX, 10)
+
+    local isGenerating = state.isGenerating
+    local btnLabel = isGenerating and "Generating..." or "Dream It!"
+
+    -- Use a custom color for the dream button
+    local btnOptions = {
+        W = bar.buttonWidth,
+        H = bar.buttonHeight,
+        Disabled = isGenerating
+    }
+
+    if Slab.Button(btnLabel, btnOptions) then
+        if state.story.general_image_prompt and state.story.general_image_prompt ~= "" then
+            local page = state.story.pages[state.selectedPageIndex]
+            if page then
+                editor.startImageGeneration(page)
+            end
+        else
+            state.storySettingsExpanded = true
+            editor.showMessage("Set Image Prompt in Story Settings first!")
+        end
+    end
+
+    Slab.EndWindow()
+end
+
+-- ============================================
+-- END NEW STORYBOOK LAYOUT PANELS
+-- ============================================
 
 function editor.addPage()
     local maxId = 0

@@ -12,6 +12,7 @@ local Layout = require("ui.layout")
 local Style = require("ui.style")
 local InputManager = require("ui.input_manager")
 local PlayScreen = require("screens.play")
+local Decorations = require("ui.decorations")
 
 local APP_MODE = "create"
 local errorMessage = nil
@@ -108,15 +109,24 @@ function love.draw()
 end
 
 function drawCreateMode()
-    love.graphics.clear(0.12, 0.12, 0.15)
+    -- Clear with warm storybook background
+    love.graphics.clear(Tokens.COLORS.warm_cream)
 
+    -- Draw decorations BEFORE Slab (they appear behind semi-transparent panels)
+    Decorations.draw()
+
+    -- Draw editor panels (queues Slab draw commands)
     editor.draw()
+
+    -- Execute all Slab draw commands
     Slab.Draw()
 
-    drawPreviewPanel()
+    -- Draw the center preview panel (on top, but uses layout positioning)
+    drawCenterPreview()
 end
 
-function drawPreviewPanel()
+-- Center preview panel - the main visual focus of the storybook layout
+function drawCenterPreview()
     local layout = Layout.getConfigLayout()
     local panel = layout.previewPanel
 
@@ -124,22 +134,40 @@ function drawPreviewPanel()
     local previewY = panel.y
     local previewW = panel.width
     local previewH = panel.height
-    local previewScale = panel.scale or 0.48
+    local previewScale = panel.scale or 0.6
 
-    love.graphics.setColor(0.15, 0.15, 0.18, 0.95)
-    love.graphics.rectangle("fill", previewX, previewY, previewW, previewH, 5)
+    -- Draw semi-transparent panel background
+    love.graphics.setColor(Tokens.COLORS.panel_dark_transparent)
+    love.graphics.rectangle("fill", previewX, previewY, previewW, previewH, 8)
 
-    love.graphics.setColor(0.2, 0.2, 0.25, 1)
-    love.graphics.rectangle("fill", previewX, previewY, previewW, 25, 5)
+    -- Draw header bar
+    love.graphics.setColor(0.15, 0.15, 0.20, 0.95)
+    love.graphics.rectangle("fill", previewX, previewY, previewW, 30, 8)
 
-    love.graphics.setColor(0.9, 0.9, 0.9)
-    love.graphics.print("Preview", previewX + 10, previewY + 5)
+    -- Preview label
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.print("Preview", previewX + 15, previewY + 7)
 
-    love.graphics.setColor(0.3, 0.3, 0.35, 1)
-    love.graphics.rectangle("line", previewX, previewY, previewW, previewH, 5)
+    -- Draw subtle border
+    love.graphics.setColor(0.35, 0.35, 0.40, 0.8)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", previewX, previewY, previewW, previewH, 8)
+    love.graphics.setLineWidth(1)
+
+    -- Calculate centering for the preview content
+    local contentX = previewX + panel.padding
+    local contentY = previewY + 40
+    local contentW = previewW - panel.padding * 2
+    local contentH = previewH - 50
+
+    -- Center the scaled preview within the content area
+    local scaledW = 800 * previewScale
+    local scaledH = 600 * previewScale
+    local offsetX = (contentW - scaledW) / 2
+    local offsetY = (contentH - scaledH) / 2
 
     love.graphics.push()
-    love.graphics.translate(previewX + 10, previewY + 35)
+    love.graphics.translate(contentX + offsetX, contentY + offsetY)
     love.graphics.scale(previewScale, previewScale)
 
     local page = editor.getCurrentPage()
@@ -147,10 +175,16 @@ function drawPreviewPanel()
         drawPreviewPage(page)
     else
         love.graphics.setColor(0.5, 0.5, 0.5)
-        love.graphics.print("No page selected", 100, 200)
+        love.graphics.print("No page selected", 300, 280)
     end
 
     love.graphics.pop()
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Legacy function name for compatibility
+function drawPreviewPanel()
+    drawCenterPreview()
 end
 
 function drawPreviewPage(page)
@@ -306,7 +340,13 @@ end
 function love.mousepressed(x, y, button)
     if button ~= 1 then return end
 
-    if APP_MODE == "play" then
+    if APP_MODE == "create" then
+        -- Handle custom thumbnail panel clicks (before Slab processes)
+        if editor.handleThumbnailClick(x, y) then
+            return
+        end
+        -- Slab handles the rest via its own input system
+    elseif APP_MODE == "play" then
         if errorMessage then return end
         if gamestate.isFinished() then return end
 
