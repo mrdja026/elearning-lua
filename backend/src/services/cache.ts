@@ -1,6 +1,6 @@
 import { Redis } from '@upstash/redis';
 import crypto from 'crypto';
-import type { ResearchData, WizardSession, ArtStyle } from '../types/story.js';
+import type { ResearchData, WizardSession, ArtStyle, TargetAge } from '../types/story.js';
 
 // In-memory fallback cache for DEV_MODE or when Redis is not configured
 const memoryCache = new Map<string, { value: string; expiresAt: number }>();
@@ -138,11 +138,22 @@ function generateSessionId(): string {
   return crypto.randomBytes(16).toString('hex');
 }
 
-export async function createSession(topic: string, artStyle: ArtStyle): Promise<WizardSession> {
+export interface CreateSessionOptions {
+  topic: string;
+  artStyle: ArtStyle;
+  targetAge?: TargetAge;
+  pageCount?: number;
+  pageHints?: string[];
+}
+
+export async function createSession(options: CreateSessionOptions): Promise<WizardSession> {
   const session: WizardSession = {
     id: generateSessionId(),
-    topic,
-    artStyle,
+    topic: options.topic,
+    artStyle: options.artStyle,
+    targetAge: options.targetAge,
+    pageCount: options.pageCount,
+    pageHints: options.pageHints,
     step: 'started',
     createdAt: new Date().toISOString(),
   };

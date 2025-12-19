@@ -5,6 +5,7 @@ local gamestate = require("gamestate")
 local logic = require("logic")
 local renderer = require("renderer")
 local editor = require("editor")
+local wizard = require("wizard")
 
 -- New UI system modules
 local Tokens = require("ui.tokens")
@@ -16,6 +17,15 @@ local Decorations = require("ui.decorations")
 
 local APP_MODE = "create"
 local errorMessage = nil
+
+-- Check for --ai flag in command line arguments
+local AUTO_AI_WIZARD = false
+for i, v in ipairs(arg or {}) do
+    if v == "--ai" then
+        AUTO_AI_WIZARD = true
+        break
+    end
+end
 
 -- Preview canvas for config mode (renders PlayScreen at virtual resolution)
 local previewCanvas = nil
@@ -47,7 +57,7 @@ function love.load()
 
     -- Initialize game systems
     gamestate.init()
-    editor.init()
+    editor.init({ autoAiWizard = AUTO_AI_WIZARD })
     PlayScreen.init()
 
     -- Set up play screen callbacks
@@ -102,6 +112,7 @@ function love.update(dt)
     if APP_MODE == "create" then
         Slab.Update(dt)
         editor.update(dt)
+        wizard.update(dt)  -- Update wizard thread polling
     else
         -- Update play screen
         PlayScreen.update(dt, gamestate)
@@ -141,6 +152,9 @@ function drawCreateMode()
 
     -- Draw modal dialogs on top of EVERYTHING (highest z-index)
     editor.drawModalDialogs()
+
+    -- Draw wizard on top of everything (highest z-index)
+    wizard.draw()
 end
 
 -- Center preview panel - shows the story/page image prominently
@@ -284,6 +298,11 @@ function love.mousepressed(x, y, button)
     if button ~= 1 then return end
 
     if APP_MODE == "create" then
+        -- Handle wizard clicks first (highest priority, blocks all other input)
+        if wizard.isOpen() then
+            wizard.handleMouseClick(x, y)
+            return
+        end
         -- Handle dialog clicks first (highest priority)
         if editor.handleLoadSavedDialogClick(x, y) then
             return
@@ -331,7 +350,19 @@ function love.mousepressed(x, y, button)
 end
 
 function love.keypressed(key)
+    -- Handle wizard keyboard input first (if open)
+    if APP_MODE == "create" and wizard.isOpen() then
+        if wizard.keypressed(key) then
+            return
+        end
+    end
+
     if key == "tab" then
+        -- Don't switch modes while wizard is open
+        if wizard.isOpen() then
+            return
+        end
+
         if APP_MODE == "create" then
             APP_MODE = "play"
             -- Clear Slab's focused input to prevent it from capturing keystrokes in play mode
@@ -379,6 +410,10 @@ end
 
 function love.textinput(text)
     if APP_MODE == "create" then
+        -- Handle wizard text input first (if open)
+        if wizard.isOpen() and wizard.textinput(text) then
+            return
+        end
         editor.textinput(text)
     else
         local page = gamestate.getCurrentPage()

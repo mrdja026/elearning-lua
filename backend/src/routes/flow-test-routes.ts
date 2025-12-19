@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { enhanceStoryPrompt } from '../agents/prompt-enhancer.js';
-import { runImageAgent } from '../agents/image-agent.js';
+import { runImageAgent, runImageAgentWithHint } from '../agents/image-agent.js';
 import type { ArtStyle, TargetAge } from '../types/story.js';
 
 export const flowTestRoutes = new Hono();
@@ -13,6 +13,8 @@ interface FlowSession {
   topic: string;
   artStyle: ArtStyle;
   targetAge: TargetAge;
+  pageCount: number;
+  pageHints: string[];
   step: 'started' | 'confirmed' | 'images_started' | 'completed';
   enhancedPrompt?: string;
   suggestedCharacter?: string;
@@ -22,6 +24,8 @@ interface FlowSession {
     originalPrompt: string;
     enhancedPrompt: string;
     cloudinaryUrl: string;
+    visualMetaphor?: string;
+    hint?: string;
   }>;
   createdAt: Date;
 }
@@ -41,24 +45,35 @@ function cleanupSessions() {
 }
 
 // Step 1: Start the flow
-// curl -X POST http://localhost:3000/api/flow-test/start -H "Content-Type: application/json" -d '{"topic": "why is the sky blue", "artStyle": "fantasy"}'
+// curl -X POST http://localhost:3000/api/flow-test/start -H "Content-Type: application/json" -d '{"topic": "why is the sky blue", "artStyle": "fantasy", "pageCount": 3, "pageHints": ["if statement", "for loop", "variables"]}'
 flowTestRoutes.post('/start', async (c) => {
   cleanupSessions();
   console.log('\n============================================');
   console.log('[FlowTest] POST /api/flow-test/start');
 
   try {
-    const body = await c.req.json<{ topic: string; artStyle?: ArtStyle; targetAge?: TargetAge }>();
+    const body = await c.req.json<{
+      topic: string;
+      artStyle?: ArtStyle;
+      targetAge?: TargetAge;
+      pageCount?: number;
+      pageHints?: string[];
+    }>();
 
     if (!body.topic) {
       return c.json({ error: 'Missing required field: topic' }, 400);
     }
+
+    const pageCount = Math.min(Math.max(body.pageCount || 3, 1), 5); // Clamp to 1-5
+    const pageHints = body.pageHints || [];
 
     const session: FlowSession = {
       id: generateId(),
       topic: body.topic,
       artStyle: body.artStyle || 'fantasy',
       targetAge: body.targetAge || '5-8',
+      pageCount,
+      pageHints,
       step: 'started',
       pages: [],
       createdAt: new Date(),
@@ -69,12 +84,16 @@ flowTestRoutes.post('/start', async (c) => {
     console.log(`[FlowTest] Session created: ${session.id}`);
     console.log(`[FlowTest] Topic: "${session.topic}"`);
     console.log(`[FlowTest] Target Age: ${session.targetAge}`);
+    console.log(`[FlowTest] Page Count: ${session.pageCount}`);
+    console.log(`[FlowTest] Page Hints: ${session.pageHints.length > 0 ? session.pageHints.join(', ') : '(none)'}`);
     console.log('============================================\n');
 
     return c.json({
       success: true,
       sessionId: session.id,
       targetAge: session.targetAge,
+      pageCount: session.pageCount,
+      pageHints: session.pageHints,
       step: session.step,
       question: {
         type: 'yesno',
@@ -262,36 +281,60 @@ flowTestRoutes.post('/generate-pages', async (c) => {
     }
 
     console.log(`[FlowTest] Session: ${session.id}`);
-    console.log('[FlowTest] Generating page images...');
-
-    // Generate 3 page images
-    const pagePrompts = [
-      `Page 1: A curious child discovering something amazing about ${session.topic}`,
-      `Page 2: ${session.suggestedCharacter || 'A friendly guide'} explaining the science behind ${session.topic}`,
-      `Page 3: A happy ending scene celebrating the learning journey about ${session.topic}`,
-    ];
+    console.log(`[FlowTest] Generating ${session.pageCount} page images...`);
+    console.log(`[FlowTest] Using hints: ${session.pageHints.length > 0 ? 'yes' : 'no'}`);
 
     const pageResults = [];
-    for (let i = 0; i < pagePrompts.length; i++) {
+    for (let i = 0; i < session.pageCount; i++) {
       // Throttle: wait 3 seconds between API calls to avoid rate limits
       if (i > 0) {
         console.log(`[FlowTest] Throttling: waiting 3s before next image...`);
         await new Promise((resolve) => setTimeout(resolve, 3000));
       }
-      console.log(`[FlowTest] Generating page ${i + 1}/3...`);
-      const result = await runImageAgent(pagePrompts[i], session.artStyle, session.topic);
-      session.pages.push({
-        pageNumber: i + 1,
-        originalPrompt: pagePrompts[i],
-        enhancedPrompt: result.enhancedPrompt,
-        cloudinaryUrl: result.cloudinaryUrl,
-      });
-      pageResults.push({
-        page: i + 1,
-        originalPrompt: pagePrompts[i],
-        enhancedPrompt: result.enhancedPrompt,
-        cloudinaryUrl: result.cloudinaryUrl,
-      });
+
+      const hint = session.pageHints[i] || '';
+      console.log(`[FlowTest] Generating page ${i + 1}/${session.pageCount}${hint ? ` (hint: "${hint}")` : ''}...`);
+
+      // Use hint-driven image generation if hint is provided
+      if (hint) {
+        const result = await runImageAgentWithHint(hint, session.topic, session.artStyle, session.targetAge);
+        session.pages.push({
+          pageNumber: i + 1,
+          originalPrompt: hint,
+          enhancedPrompt: result.enhancedPrompt,
+          cloudinaryUrl: result.cloudinaryUrl,
+          visualMetaphor: result.visualMetaphor,
+          hint: result.hint,
+        });
+        pageResults.push({
+          page: i + 1,
+          hint: result.hint,
+          visualMetaphor: result.visualMetaphor,
+          enhancedPrompt: result.enhancedPrompt,
+          cloudinaryUrl: result.cloudinaryUrl,
+        });
+      } else {
+        // Fallback to generic prompts if no hint
+        const genericPrompts = [
+          `A curious child discovering something amazing about ${session.topic}`,
+          `${session.suggestedCharacter || 'A friendly guide'} explaining the science behind ${session.topic}`,
+          `A happy ending scene celebrating the learning journey about ${session.topic}`,
+        ];
+        const prompt = genericPrompts[i % genericPrompts.length];
+        const result = await runImageAgent(prompt, session.artStyle, session.topic);
+        session.pages.push({
+          pageNumber: i + 1,
+          originalPrompt: prompt,
+          enhancedPrompt: result.enhancedPrompt,
+          cloudinaryUrl: result.cloudinaryUrl,
+        });
+        pageResults.push({
+          page: i + 1,
+          originalPrompt: prompt,
+          enhancedPrompt: result.enhancedPrompt,
+          cloudinaryUrl: result.cloudinaryUrl,
+        });
+      }
     }
 
     session.step = 'completed';
@@ -308,11 +351,15 @@ flowTestRoutes.post('/generate-pages', async (c) => {
         topic: session.topic,
         artStyle: session.artStyle,
         targetAge: session.targetAge,
+        pageCount: session.pageCount,
+        pageHints: session.pageHints,
         enhancedStoryPrompt: session.enhancedPrompt,
         suggestedCharacter: session.suggestedCharacter,
         keyThemes: session.keyThemes,
         images: session.pages.map((p) => ({
           page: p.pageNumber === 0 ? 'cover' : p.pageNumber,
+          hint: p.hint,
+          visualMetaphor: p.visualMetaphor,
           originalPrompt: p.originalPrompt,
           enhancedPrompt: p.enhancedPrompt,
           cloudinaryUrl: p.cloudinaryUrl,

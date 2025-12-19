@@ -6,7 +6,9 @@ import { runResearcher } from '../agents/researcher.js';
 import { runStoryteller } from '../agents/storyteller.js';
 import { runCritic } from '../agents/critic.js';
 import { runPipeline } from '../agents/index.js';
-import type { ResearchData, StoryData, ArtStyle } from '../types/story.js';
+import { enhanceImagePromptWithHint } from '../agents/prompt-enhancer.js';
+import { runImageAgentWithHint } from '../agents/image-agent.js';
+import type { ResearchData, StoryData, ArtStyle, TargetAge } from '../types/story.js';
 
 export const testRoutes = new Hono();
 
@@ -311,6 +313,103 @@ testRoutes.post('/test-pipeline', async (c) => {
       },
       review: result.review,
       metadata: result.metadata,
+    });
+  } catch (error) {
+    console.error('[TEST] Error:', error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+// Test hint-driven prompt enhancer (visual metaphor generation)
+testRoutes.post('/test-hint-prompt', async (c) => {
+  const startTime = Date.now();
+  console.log('\n========================================');
+  console.log('[TEST] POST /api/test-hint-prompt');
+
+  try {
+    const body = await c.req.json<{
+      hint: string;
+      topic: string;
+      artStyle?: ArtStyle;
+      targetAge?: TargetAge;
+    }>();
+
+    if (!body.hint || !body.topic) {
+      return c.json({ error: 'Missing required fields: hint and topic' }, 400);
+    }
+
+    const artStyle = body.artStyle || 'pixel';
+    const targetAge = body.targetAge || '8-12';
+
+    console.log(`[TEST] Hint: ${body.hint}`);
+    console.log(`[TEST] Topic: ${body.topic}`);
+    console.log(`[TEST] Art style: ${artStyle}`);
+    console.log(`[TEST] Target age: ${targetAge}`);
+
+    const result = await enhanceImagePromptWithHint(body.hint, body.topic, artStyle, targetAge);
+
+    console.log(`[TEST] Completed in ${Date.now() - startTime}ms`);
+    console.log('========================================\n');
+
+    return c.json({
+      success: true,
+      visualMetaphor: result.visualMetaphor,
+      enhancedPrompt: result.enhancedPrompt,
+      negativePrompt: result.negativePrompt,
+      tokens: {
+        input: result.inputTokens,
+        output: result.outputTokens,
+      },
+      durationMs: result.durationMs,
+    });
+  } catch (error) {
+    console.error('[TEST] Error:', error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+// Test hint-driven image generation (full pipeline: hint → metaphor → image → upload)
+testRoutes.post('/test-hint-image', async (c) => {
+  const startTime = Date.now();
+  console.log('\n========================================');
+  console.log('[TEST] POST /api/test-hint-image');
+
+  try {
+    const body = await c.req.json<{
+      hint: string;
+      topic: string;
+      artStyle?: ArtStyle;
+      targetAge?: TargetAge;
+    }>();
+
+    if (!body.hint || !body.topic) {
+      return c.json({ error: 'Missing required fields: hint and topic' }, 400);
+    }
+
+    const artStyle = body.artStyle || 'cartoon';
+    const targetAge = body.targetAge || '5-8';
+
+    console.log(`[TEST] Hint: ${body.hint}`);
+    console.log(`[TEST] Topic: ${body.topic}`);
+    console.log(`[TEST] Art style: ${artStyle}`);
+    console.log(`[TEST] Target age: ${targetAge}`);
+
+    const result = await runImageAgentWithHint(body.hint, body.topic, artStyle, targetAge);
+
+    console.log(`[TEST] Completed in ${Date.now() - startTime}ms`);
+    console.log('========================================\n');
+
+    return c.json({
+      success: true,
+      hint: result.hint,
+      visualMetaphor: result.visualMetaphor,
+      enhancedPrompt: result.enhancedPrompt,
+      imageUrl: result.cloudinaryUrl,
+      tokens: {
+        input: result.tokens.input,
+        output: result.tokens.output,
+      },
+      durationMs: result.durationMs,
     });
   } catch (error) {
     console.error('[TEST] Error:', error);

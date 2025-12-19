@@ -1,0 +1,69 @@
+{
+  "title": "Dr. Aris Thorne's Adventure: Workplace ethic, corporate style",
+  "topic": "Workplace ethic, corporate style",
+  "general_image_prompt": "The polished chrome and hushed efficiency of 'Aethelred Global Strategies' hums with an almost palpable tension. You are a junior analyst, fresh out of a prestigious business program, privy to the inner workings of a multinational corporation that has, until now, been your sole focus. Your mentor, a seasoned executive named Eleanor Vance, renowned for her razor-sharp intellect and unwavering adherence to the company's 'Ethos of Excellence,' has just tasked you with a seemingly innocuous project: analyzing the financial discrepancies within a recently acquired subsidiary in a developing market. As you delve deeper, however, the numbers begin to tell a far more complex story – one that hints at ethical compromises, strategic obfuscation, and potentially illegal practices that reach surprisingly high up the corporate ladder. Do you expose the truth, risking your nascent career and the wrath of powerful figures, or do you rationalize the findings, becoming complicit in a system that prioritizes profit over principle? The air in your sterile, minimalist office, usually a sanctuary of intellectual pursuit, now feels thick with unspoken questions and the scent of stale coffee, each keystroke echoing with the weight of your impending decision. The muted glow of your monitor illuminates not just spreadsheets, but the stark reality of corporate governance and the slippery slope of ethical ambiguity.",
+  "cover_image_path": "images/cover_1766179080085.png",
+  "target_age": "18+",
+  "art_style": "fantasy",
+  "pages": [
+    {
+      "id": 1,
+      "image_path": "images/page1_1766179080085.png",
+      "image_prompt": "Fantasy art style, full shot of a powerful sorceress in a grand, dimly lit chamber, working late into the night. She wears sophisticated, dark, shimmering robes with arcane symbols, and sleek, form-fitting leggings. Her legs dangle casually from a swirling vortex of celestial energy that functions as her elevated workspace, resembling a corporate desk in the sky. Below, a breathtaking, sprawling cityscape of glowing towers stretches to the horizon, representing the 'corporation'. Numerous glowing orbs float around her, each containing a miniature, swirling scene of her ongoing tasks and projects, illuminating the scene with their magical light. The overall atmosphere is one of intense focus, dedication, and solitary ambition. High detail, dramatic lighting, epic scale.",
+      "hint_text": "Woman with legs hanging from the celing works late",
+      "visual_metaphor": "A powerful sorceress, adorned in sophisticated, dark robes that shimmer with arcane symbols, meticulously crafts an intricate spell. Her legs, clad in sleek, form-fitting leggings reminiscent of high-end corporate attire, dangle casually from a swirling vortex of celestial energy that serves as her 'desk' high above the moonlit chamber. Below her, a sprawling cityscape of glowing towers represents the 'corporation', each light a testament to tireless effort. Around her float glowing orbs, each containing a miniature, swirling scene of her ongoing projects and tasks, symbolizing the late-night work.",
+      "question_text": "Did you understand this concept?",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    },
+    {
+      "id": 2,
+      "image_path": "images/page2_1766179080085.png",
+      "image_prompt": "Fantasy art, cinematic, a powerful and elegant dragoness with intricate scales and regal attire, sits at a magnificent, rune-inlaid obsidian desk in a lavish, fantasy corporate office. She has a look of intense frustration and impatience, tapping her sharp claws on a glowing golden scroll. Behind her, a vast, arched window reveals a spectacular, fiery bomb explosion over a stylized, miniature fantasy cityscape. Smoke and debris fill the air outside, contrasting sharply with the controlled, opulent interior. The dragoness's focus is unwavering, embodying stoic corporate resilience amidst chaos. Dramatic lighting, epic scale, detailed textures.",
+      "hint_text": "Woman is frustrated and there is a bomb explosion cinematic behind her",
+      "visual_metaphor": "A stern, elegantly dressed dragoness sits at a massive, ornate desk made of dark, polished wood and inlaid with glowing runes. Her claws tap impatiently on a golden scroll, her expression a mask of regal disapproval. Behind her, through a colossal, arched window, a chaotic, fiery explosion erupts over a miniature, stylized cityscape representing the chaotic 'industry' or 'market'. Smoke and embers billow upwards, but the dragoness remains composed, her focus solely on the scroll before her. The office is opulent, filled with ancient artifacts and glowing magical lamps.",
+      "question_text": "Did you understand this concept?",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    },
+    {
+      "id": 3,
+      "image_path": "images/page3_1766179080085.png",
+      "image_prompt": "Fantasy art style, a lone woman with a determined yet thoughtful expression stands at a literal crossroads in a mystical, ancient forest. To her left, a dark, tangled path is choked with thorny, grasping vines and swirling mist, littered with decaying leaves and broken, discarded tools. To her right, a luminous, smooth stone path bathed in warm sunlight leads towards a magnificent, shimmering citadel in the distance. She holds a single, softly glowing orb in her hand, representing her present decision. The title 'NISH' is subtly integrated into the bark of a colossal, ancient tree near the crossroads. The overall mood is one of introspection, choice, and the power of conscious ethical decision-making in shaping one's future career path. High detail, cinematic lighting, ethereal glow.",
+      "hint_text": "Woman questions life background forest with title \"NISH\"",
+      "visual_metaphor": "A solitary woman stands at a crossroads in an ancient, enchanted forest. One path, overgrown with thorny vines and shrouded in mist, represents her past experiences and potentially negative influences. The other path, bathed in sunlight and paved with smooth, glowing stones, leads towards a distant, shimmering citadel, symbolizing her professional future and ethical choices.  She holds a single, luminous orb in her hand, representing her current moment of decision and self-awareness. The forest floor is littered with fallen, decaying leaves and discarded tools from the 'past' path, contrasting with the vibrant, blossoming flora along the 'future' path. The title 'NISH' is subtly woven into the bark of a wise, old tree near the crossroads.",
+      "question_text": "Did you understand this concept?",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    }
+  ],
+  "generation": {
+    "source": "ai",
+    "grounded_facts": [
+      "Ethical decision-making in a corporate environment",
+      "The conflict between profit and principle",
+      "Navigating corporate politics and power structures",
+      "Whistleblowing and its consequences",
+      "The complexities of global business practices"
+    ],
+    "source_urls": [],
+    "timestamp": "2025-12-19T21:18:03.163Z"
+  },
+  "critic_review": {
+    "approved": true,
+    "warnings": [],
+    "readabilityScore": 85
+  }
+}

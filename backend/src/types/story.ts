@@ -61,6 +61,9 @@ export interface WizardSession {
   artStyle: ArtStyle;
   step: WizardStep;
   createdAt: string;
+  pageCount?: number;
+  pageHints?: string[];
+  targetAge?: TargetAge;
   researchData?: ResearchData;
   storyData?: StoryData;
   reviewData?: CriticReview;
@@ -75,6 +78,9 @@ export interface GenerateStoryRequest {
 export interface WizardStartRequest {
   topic: string;
   artStyle?: ArtStyle;
+  targetAge?: TargetAge;
+  pageCount?: number;
+  pageHints?: string[];
 }
 
 export interface WizardStepRequest {

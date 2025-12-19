@@ -1,0 +1,44 @@
+{
+  "title": "Cute panda turtle likes the sun",
+  "topic": "Cute panda turtle likes the sun",
+  "general_image_prompt": "Once upon a time, in a jungle filled with giggling flowers and trees that whispered secrets, lived a special little creature named Pip. Pip wasn't just any creature; he was a super-duper cute panda turtle! His shell looked like a fluffy panda's tummy, and his little legs were as round and soft as baby bamboo shoots. Pip LOVED the sun more than anything!",
+  "cover_image_path": "http://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg",
+  "pages": [
+    {
+      "id": 1,
+      "image_path": "http://res.cloudinary.com/demo/image/upload/w_400,h_400,c_fill/cld-sample-5.jpg",
+      "image_prompt": "Turtle panda wakes up",
+      "question_text": "What do you see in this picture about Cute panda turtle likes the sun?",
+      "hint_text": "Turtle panda wakes up",
+      "choice_labels": ["Yes", "No"],
+      "question_type": "yesno",
+      "correct_answer_is_yes": true,
+      "correct_answer": "",
+      "questions": []
+    },
+    {
+      "id": 2,
+      "image_path": "http://res.cloudinary.com/demo/image/upload/w_400,h_400,c_fill/cld-sample-4.jpg",
+      "image_prompt": "Turtle panda eats",
+      "question_text": "What do you see in this picture about Cute panda turtle likes the sun?",
+      "hint_text": "Turtle panda eats",
+      "choice_labels": ["Yes", "No"],
+      "question_type": "yesno",
+      "correct_answer_is_yes": true,
+      "correct_answer": "",
+      "questions": []
+    },
+    {
+      "id": 3,
+      "image_path": "http://res.cloudinary.com/demo/image/upload/w_400,h_400,c_fill/cld-sample-3.jpg",
+      "image_prompt": "Turtle panda sleeps",
+      "question_text": "What do you see in this picture about Cute panda turtle likes the sun?",
+      "hint_text": "Turtle panda sleeps",
+      "choice_labels": ["Yes", "No"],
+      "question_type": "yesno",
+      "correct_answer_is_yes": true,
+      "correct_answer": "",
+      "questions": []
+    }
+  ]
+}

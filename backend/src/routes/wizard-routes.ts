@@ -31,7 +31,7 @@ wizardRoutes.post('/start', async (c) => {
     console.log(`[Wizard] Topic: "${body.topic}"`);
     console.log(`[Wizard] Art style: ${artStyle}`);
 
-    const session = await createSession(body.topic, artStyle);
+    const session = await createSession({ topic: body.topic, artStyle });
 
     console.log(`[Wizard] Session created: ${session.id}`);
     console.log('========================================\n');

@@ -5,6 +5,7 @@ local Layout = require("ui.layout")
 local Tokens = require("ui.tokens")
 local ImageCard = require("components.image_card")
 local PlayScreen = require("screens.play")
+local wizard = require("wizard")
 
 local editor = {}
 
@@ -39,11 +40,174 @@ local state = {
     downloadThread = nil,
     pendingDownloads = 0,
     -- Storybook UI state
-    storySettingsExpanded = false
+    storySettingsExpanded = false,
+    -- Wizard state
+    showWizard = false,
+    wizardSavePending = false,  -- Save story after wizard downloads complete
+    autoAiWizard = false  -- Only auto-open wizard if --ai flag is passed
 }
 
-function editor.init()
+function editor.init(options)
+    options = options or {}
+    state.autoAiWizard = options.autoAiWizard or false
+    wizard.init()
     editor.newStory()
+end
+
+-- Check if story is empty/default (triggers wizard auto-open)
+function editor.isStoryEmpty()
+    if not state.story or not state.story.pages then return true end
+    if #state.story.pages ~= 1 then return false end
+
+    local page = state.story.pages[1]
+    return page.question_text == "Enter your question here" and
+           (not state.story.cover_image_path or state.story.cover_image_path == "")
+end
+
+-- Open the AI wizard
+function editor.openWizard()
+    state.showWizard = true
+    wizard.open(editor.onWizardComplete)
+end
+
+-- Helper to check if a path is a remote URL
+local function isRemoteUrl(path)
+    return path and (path:match("^https?://") ~= nil)
+end
+
+-- Start download thread if not running
+local function ensureDownloadThread()
+    if not state.downloadThread or not state.downloadThread:isRunning() then
+        state.downloadThread = love.thread.newThread("download_thread.lua")
+        state.downloadThread:start()
+        print("[Editor] Download thread started")
+    end
+end
+
+-- Queue a URL for download
+local function queueDownload(url, targetField)
+    ensureDownloadThread()
+    local requestChannel = love.thread.getChannel("download_request")
+    local sourceDir = love.filesystem.getSource()
+    requestChannel:push({
+        url = url,
+        targetField = targetField,
+        sourceDir = sourceDir
+    })
+    state.pendingDownloads = state.pendingDownloads + 1
+    print("[Editor] Queued download: " .. url .. " for " .. tostring(targetField) .. " (source: " .. sourceDir .. ")")
+end
+
+-- Called when wizard completes story generation
+function editor.onWizardComplete(storyData)
+    if not storyData then
+        editor.showMessage("Wizard cancelled")
+        state.showWizard = false
+        return
+    end
+
+    -- Migrate story to ensure proper format
+    local migratedStory = schema.migrateStory(storyData)
+
+    -- Load into editor first
+    state.story = migratedStory
+    state.selectedPageIndex = 1
+    state.showWizard = false
+    state.storySettingsExpanded = false  -- Collapse settings since cover is generated
+    state.pendingDownloads = 0
+
+    print("[Editor] AI story loaded: " .. (migratedStory.title or "Untitled"))
+
+    -- Queue image downloads for remote URLs
+    local downloadCount = 0
+
+    -- Check cover image
+    if isRemoteUrl(migratedStory.cover_image_path) then
+        queueDownload(migratedStory.cover_image_path, "cover")
+        downloadCount = downloadCount + 1
+    end
+
+    -- Check page images
+    if migratedStory.pages then
+        for i, page in ipairs(migratedStory.pages) do
+            if isRemoteUrl(page.image_path) then
+                queueDownload(page.image_path, i)
+                downloadCount = downloadCount + 1
+            end
+        end
+    end
+
+    if downloadCount > 0 then
+        editor.showMessage("Downloading " .. downloadCount .. " images...")
+        -- Save after downloads complete (handled in update loop)
+        state.wizardSavePending = true
+    else
+        -- No downloads needed, save now
+        local savedFilename = editor.autoSaveWizardStory(migratedStory)
+        state.isDirty = false
+        if savedFilename then
+            editor.showMessage("Story generated and saved!")
+        else
+            editor.showMessage("Story generated!")
+        end
+    end
+end
+
+-- Auto-save wizard-generated story to saves/ directory
+function editor.autoSaveWizardStory(story)
+    -- Get the source directory (where the game files are)
+    local sourceDir = love.filesystem.getSource()
+    print("[Editor] Source directory: " .. sourceDir)
+
+    -- Generate filename with timestamp
+    local timestamp = os.date("%Y%m%d_%H%M%S")
+    local titleSlug = (story.title or "story"):gsub("%s+", "_"):gsub("[^%w_]", ""):sub(1, 30)
+    local filename = string.format("%s_%s.json", timestamp, titleSlug)
+
+    -- Full path in source directory
+    local savesDir = sourceDir .. "/saves"
+    local fullPath = savesDir .. "/" .. filename
+
+    -- Encode story to JSON
+    local success, encoded = pcall(json.encode, story)
+    if not success then
+        print("[Editor] Failed to encode story JSON: " .. tostring(encoded))
+        return nil
+    end
+
+    -- Ensure saves directory exists using os.execute (works on Windows)
+    local mkdirCmd = 'mkdir "' .. savesDir .. '" 2>nul'
+    os.execute(mkdirCmd)
+
+    -- Write using native Lua io (can write to source directory)
+    print("[Editor] Saving to: " .. fullPath)
+    local file, err = io.open(fullPath, "w")
+    if file then
+        file:write(encoded)
+        file:close()
+        print("[Editor] Auto-saved wizard story to: " .. fullPath)
+        return filename
+    else
+        print("[Editor] Failed to save wizard story: " .. (err or "unknown"))
+
+        -- Fallback: try love.filesystem (writes to save directory)
+        print("[Editor] Trying fallback to LÖVE save directory...")
+        local saveDirPath = "saves/" .. filename
+        love.filesystem.createDirectory("saves")
+        local ok, writeErr = love.filesystem.write(saveDirPath, encoded)
+        if ok then
+            print("[Editor] Saved to LÖVE save directory: " .. saveDirPath)
+            return filename
+        else
+            print("[Editor] Fallback also failed: " .. (writeErr or "unknown"))
+            return nil
+        end
+    end
+end
+
+-- Check if wizard is currently open
+function editor.isWizardOpen()
+    return state.showWizard and wizard.isOpen()
 end
 
 function editor.newStory()
@@ -72,7 +236,13 @@ function editor.newStory()
     state.isGenerating = false
     state.generationError = nil
     state.storySettingsExpanded = true  -- Expanded by default for new stories
+    state.showWizard = false
     editor.showMessage("New story created")
+
+    -- Auto-open wizard for new empty stories only if --ai flag was passed
+    if state.autoAiWizard then
+        editor.openWizard()
+    end
 end
 
 function editor.showMessage(msg)
@@ -141,6 +311,15 @@ function editor.update(dt)
                 end
                 if state.pendingDownloads == 0 then
                     editor.showMessage("All images downloaded!")
+                    -- Save wizard story now that downloads are complete
+                    if state.wizardSavePending then
+                        state.wizardSavePending = false
+                        local savedFilename = editor.autoSaveWizardStory(state.story)
+                        state.isDirty = false
+                        if savedFilename then
+                            editor.showMessage("Story saved to " .. savedFilename)
+                        end
+                    end
                 end
             else
                 print("[Editor] Download failed: " .. (response.error or "unknown"))
@@ -1396,38 +1575,39 @@ function editor.loadStory(filename)
     -- Expand story settings if no cover so user can generate one
     if not story.cover_image_path or story.cover_image_path == "" then
         state.storySettingsExpanded = true
+    else
+        state.storySettingsExpanded = false
     end
 
     state.story = story
     state.selectedPageIndex = 1
     state.isDirty = false
-    editor.showMessage("Loaded " .. filename)
-end
+    state.pendingDownloads = 0
 
--- Helper to check if a path is a remote URL
-local function isRemoteUrl(path)
-    return path and (path:match("^https?://") ~= nil)
-end
+    -- Check for remote URLs and queue downloads
+    local downloadCount = 0
 
--- Start download thread if not running
-local function ensureDownloadThread()
-    if not state.downloadThread or not state.downloadThread:isRunning() then
-        state.downloadThread = love.thread.newThread("download_thread.lua")
-        state.downloadThread:start()
-        print("[Editor] Download thread started")
+    -- Check cover image
+    if isRemoteUrl(story.cover_image_path) then
+        queueDownload(story.cover_image_path, "cover")
+        downloadCount = downloadCount + 1
     end
-end
 
--- Queue a URL for download
-local function queueDownload(url, targetField)
-    ensureDownloadThread()
-    local requestChannel = love.thread.getChannel("download_request")
-    requestChannel:push({
-        url = url,
-        targetField = targetField
-    })
-    state.pendingDownloads = state.pendingDownloads + 1
-    print("[Editor] Queued download: " .. url .. " for " .. tostring(targetField))
+    -- Check page images
+    if story.pages then
+        for i, page in ipairs(story.pages) do
+            if isRemoteUrl(page.image_path) then
+                queueDownload(page.image_path, i)
+                downloadCount = downloadCount + 1
+            end
+        end
+    end
+
+    if downloadCount > 0 then
+        editor.showMessage("Loaded " .. filename .. " - downloading " .. downloadCount .. " images...")
+    else
+        editor.showMessage("Loaded " .. filename)
+    end
 end
 
 function editor.loadSavedStory(filename)
