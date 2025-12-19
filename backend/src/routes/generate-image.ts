@@ -47,21 +47,55 @@ generateImageRoute.post('/generate-image', async (c) => {
       });
     }
 
-    // Step 1: Build optimized prompt with Claude
-    console.log('\n[API] Step 1: Building prompt...');
-    const promptResult = await buildPrompt(body.description, body.question);
-    console.log(`[API] Generated prompt: ${promptResult.prompt.substring(0, 100)}...`);
+    // Step 1: Build optimized prompt with Gemini
+    console.log('\n[API] Step 1: Building prompt with Gemini...');
+    let promptResult;
+    try {
+      promptResult = await buildPrompt(body.description, body.question);
+      console.log(`[API] ✓ Prompt generated successfully`);
+      console.log(`[API]   Prompt: ${promptResult.prompt.substring(0, 100)}...`);
+    } catch (err) {
+      console.error('[API] ✗ FAILED at Step 1 (Gemini prompt)');
+      console.error('[API]   Error:', err instanceof Error ? err.message : err);
+      if (err instanceof Error && err.stack) {
+        console.error('[API]   Stack:', err.stack);
+      }
+      throw err;
+    }
 
     // Step 2: Generate image with Stability AI
-    console.log('\n[API] Step 2: Generating image...');
-    const imageResult = await generateImage(
-      promptResult.prompt,
-      promptResult.negative_prompt
-    );
+    console.log('\n[API] Step 2: Generating image with Stability AI...');
+    let imageResult;
+    try {
+      imageResult = await generateImage(
+        promptResult.prompt,
+        promptResult.negative_prompt
+      );
+      console.log(`[API] ✓ Image generated successfully (${imageResult.durationMs}ms)`);
+    } catch (err) {
+      console.error('[API] ✗ FAILED at Step 2 (Stability AI)');
+      console.error('[API]   Error:', err instanceof Error ? err.message : err);
+      if (err instanceof Error && err.stack) {
+        console.error('[API]   Stack:', err.stack);
+      }
+      throw err;
+    }
 
     // Step 3: Upload to Cloudinary
-    console.log('\n[API] Step 3: Uploading image...');
-    const uploadResult = await uploadImage(imageResult.base64Image);
+    console.log('\n[API] Step 3: Uploading to Cloudinary...');
+    let uploadResult;
+    try {
+      uploadResult = await uploadImage(imageResult.base64Image);
+      console.log(`[API] ✓ Upload successful`);
+      console.log(`[API]   URL: ${uploadResult.imageUrl}`);
+    } catch (err) {
+      console.error('[API] ✗ FAILED at Step 3 (Cloudinary)');
+      console.error('[API]   Error:', err instanceof Error ? err.message : err);
+      if (err instanceof Error && err.stack) {
+        console.error('[API]   Stack:', err.stack);
+      }
+      throw err;
+    }
 
     const totalDuration = Date.now() - startTime;
 
@@ -87,14 +121,21 @@ generateImageRoute.post('/generate-image', async (c) => {
     });
   } catch (error) {
     const totalDuration = Date.now() - startTime;
-    console.error('[API] Error:', error);
-    console.log(`[API] Failed after ${totalDuration}ms`);
-    console.log('========================================\n');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    console.error('\n[API] ========== ERROR ==========');
+    console.error(`[API] Message: ${errorMessage}`);
+    if (error instanceof Error && error.stack) {
+      console.error(`[API] Stack: ${error.stack}`);
+    }
+    console.error(`[API] Failed after ${totalDuration}ms`);
+    console.error('[API] ==============================\n');
 
     return c.json(
       {
         success: false,
-        error: 'Service not available, check usage and keys',
+        error: errorMessage,
+        details: 'Check backend console for full error details',
       },
       500
     );

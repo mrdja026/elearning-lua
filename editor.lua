@@ -3,6 +3,8 @@ local json = require("libraries.json")
 local schema = require("schema")
 local Layout = require("ui.layout")
 local Tokens = require("ui.tokens")
+local ImageCard = require("components.image_card")
+local PlayScreen = require("screens.play")
 
 local editor = {}
 
@@ -23,6 +25,7 @@ local state = {
     messageTime = 0,
     showLoadDialog = false,
     availableFiles = {},
+    generatingCover = false,  -- Track if generating cover vs page image
     selectedFileIndex = 1,
     -- Image generation state
     isGenerating = false,
@@ -85,14 +88,27 @@ function editor.update(dt)
         if response then
             state.isGenerating = false
             if response.success then
-                local page = state.story.pages[state.selectedPageIndex]
-                if page then
-                    page.image_path = response.data
-                    editor.showMessage("Image generated!")
+                if state.generatingCover then
+                    -- Cover image generated
+                    state.story.cover_image_path = response.data
+                    -- NOTE: Keep general_image_prompt - it's used for all page images too!
+                    state.storySettingsExpanded = false
+                    state.selectedPageIndex = 0
+                    editor.showMessage("Cover generated!")
+                    print("[Editor] Cover generated, path: " .. response.data)
+                else
+                    -- Page image generated
+                    local page = state.story.pages[state.selectedPageIndex]
+                    if page then
+                        page.image_path = response.data
+                        editor.showMessage("Image generated!")
+                    end
                 end
+                state.generatingCover = false
             else
                 state.generationError = response.data
                 editor.showMessage("Error: " .. response.data)
+                state.generatingCover = false
             end
         end
     end
@@ -101,6 +117,7 @@ end
 function editor.draw()
     -- New storybook layout: Thumbnails | Preview (center) | Control Deck
     editor.drawPageThumbnails()      -- Left sidebar
+    editor.drawPreviewPanel()        -- Center preview (NEW!)
     editor.drawStorySettingsHeader() -- Top of right sidebar (collapsible)
     editor.drawControlDeck()         -- Right sidebar (below story settings)
     editor.drawDreamItButton()       -- Bottom bar
@@ -119,6 +136,107 @@ function editor.draw()
         love.graphics.setColor(1, 1, 1)
         love.graphics.print(state.message, msgX + 15, msgY + 9)
     end
+end
+
+-- Draw the center preview panel using PlayScreen component
+function editor.drawPreviewPanel()
+    local layout = Layout.getConfigLayout()
+    local panel = layout.previewPanel
+
+    -- Draw panel background
+    love.graphics.setColor(Tokens.COLORS.surface)
+    love.graphics.rectangle("fill", panel.x, panel.y, panel.width, panel.height, 8)
+
+    -- Draw border
+    love.graphics.setColor(Tokens.COLORS.surface_elevated)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", panel.x, panel.y, panel.width, panel.height, 8)
+    love.graphics.setLineWidth(1)
+
+    -- Determine display mode based on selection
+    local displayMode
+    local label
+
+    if state.selectedPageIndex == 0 then
+        -- Page-Story selected: show cover in STORY mode
+        displayMode = PlayScreen.MODE_STORY
+        label = "Story Cover"
+    else
+        -- Regular page selected: show page in PAGE mode
+        displayMode = PlayScreen.MODE_PAGE
+        label = "Page " .. state.selectedPageIndex .. " Preview"
+    end
+
+    -- Draw label at top
+    love.graphics.setColor(Tokens.COLORS.text_secondary)
+    local labelX = panel.x + panel.padding
+    local labelY = panel.y + 10
+    love.graphics.print(label, labelX, labelY)
+
+    -- Calculate preview area bounds (below label)
+    local bounds = {
+        x = panel.x + panel.padding,
+        y = panel.y + 35,
+        width = panel.width - panel.padding * 2,
+        height = panel.height - 50
+    }
+
+    -- Use PlayScreen to render preview with appropriate mode
+    if displayMode == PlayScreen.MODE_STORY then
+        -- STORY mode: pass the story directly
+        PlayScreen.draw(state.story, nil, {
+            mode = PlayScreen.MODE_STORY,
+            preview = true,
+            bounds = bounds
+        })
+    else
+        -- PAGE mode: create a minimal gamestate for preview
+        local previewGamestate = {
+            getCurrentPage = function()
+                return state.story.pages[state.selectedPageIndex]
+            end,
+            getStory = function()
+                return state.story
+            end
+        }
+
+        -- For PAGE mode in preview, just draw the image (not the full play layout)
+        local page = state.story.pages[state.selectedPageIndex]
+        local imagePath = page and page.image_path or ""
+
+        -- Draw image preview area
+        love.graphics.setColor(Tokens.COLORS.surface_elevated)
+        love.graphics.rectangle("fill", bounds.x, bounds.y, bounds.width, bounds.height, 4)
+
+        local image = nil
+        if imagePath and imagePath ~= "" then
+            image = ImageCard.loadImage(imagePath)
+        end
+
+        if image then
+            local scaleX = bounds.width / image:getWidth()
+            local scaleY = bounds.height / image:getHeight()
+            local scale = math.min(scaleX, scaleY)
+
+            local drawW = image:getWidth() * scale
+            local drawH = image:getHeight() * scale
+            local drawX = bounds.x + (bounds.width - drawW) / 2
+            local drawY = bounds.y + (bounds.height - drawH) / 2
+
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.draw(image, drawX, drawY, 0, scale, scale)
+        else
+            love.graphics.setColor(Tokens.COLORS.text_disabled)
+            local placeholder = imagePath == "" and "[No Image - Generate one!]" or "[Image not found]"
+            local font = love.graphics.getFont()
+            local textW = font:getWidth(placeholder)
+            local textX = bounds.x + (bounds.width - textW) / 2
+            local textY = bounds.y + bounds.height / 2 - 8
+            love.graphics.print(placeholder, textX, textY)
+        end
+    end
+
+    love.graphics.setColor(1, 1, 1, 1)
 end
 
 function editor.drawFilePanel()
@@ -449,12 +567,11 @@ function editor.drawPageThumbnails()
     local layout = Layout.getConfigLayout()
     local panel = layout.thumbnailsPanel
 
-    -- Check if Pages panel should be gated (no cover for new stories)
+    -- Check if Pages panel should be gated (no cover = pages disabled)
     state.story.cover_image_path = state.story.cover_image_path or ""
     local hasCover = state.story.cover_image_path ~= ""
-    -- Legacy stories (loaded from file) should not be gated
-    local isLegacyStory = state.story._isLegacy == true
-    local pagesEnabled = hasCover or isLegacyStory
+    -- All stories require cover before pages can be edited (no legacy exception)
+    local pagesEnabled = hasCover
 
     -- Draw panel background
     if pagesEnabled then
@@ -612,11 +729,11 @@ function editor.handleThumbnailClick(x, y)
     if x < panel.x or x > panel.x + panel.width then return false end
     if y < panel.y or y > panel.y + panel.height then return false end
 
-    -- Check if Pages panel is gated
+    -- Check if Pages panel is gated (no cover = pages disabled)
     state.story.cover_image_path = state.story.cover_image_path or ""
     local hasCover = state.story.cover_image_path ~= ""
-    local isLegacyStory = state.story._isLegacy == true
-    local pagesEnabled = hasCover or isLegacyStory
+    -- All stories require cover before pages can be edited (no legacy exception)
+    local pagesEnabled = hasCover
 
     if not pagesEnabled then
         editor.showMessage("Generate cover first!")
@@ -766,26 +883,11 @@ function editor.drawStorySettingsHeader()
         end
 
         -- Generate Cover button
-        if state.isGenerating then
+        if state.isGenerating and state.generatingCover then
             Slab.Text("Generating cover...", {Color = {0.8, 0.8, 0.3, 1}})
         else
-            if Slab.Button("Generate Cover", {W = inputW, Disabled = not hasPrompt}) then
-                -- DEV_MODE: Use existing test image as placeholder
-                local mockImage = "pics/Gemini_Generated_Image_rod070rod070rod0.png"
-
-                -- 1. Set cover image (FIXED - won't change)
-                state.story.cover_image_path = mockImage
-
-                -- 2. Clear only the prompt (title/topic stay saved!)
-                state.story.general_image_prompt = ""
-
-                -- 3. Collapse Story Settings
-                state.storySettingsExpanded = false
-
-                -- 4. Select Page-Story (index 0)
-                state.selectedPageIndex = 0
-
-                editor.showMessage("Cover generated! Page-Story created.")
+            if Slab.Button("Generate Cover", {W = inputW, Disabled = not hasPrompt or state.isGenerating}) then
+                editor.startCoverGeneration()
             end
             if not hasPrompt then
                 Slab.Text("Enter Image Prompt first", {Color = {0.6, 0.6, 0.6, 1}})
@@ -900,14 +1002,22 @@ function editor.drawControlDeck()
         Slab.Text("Enter prompt to generate", {Color = {0.8, 0.6, 0.4, 1}})
     end
 
-    -- Generate Image button (only uses page prompt)
-    if state.isGenerating then
+    -- Generate Image button (uses page image prompt + question only)
+    if state.isGenerating and not state.generatingCover then
         Slab.Text("Generating...", {Color = {0.8, 0.8, 0.3, 1}})
     else
-        if Slab.Button("Generate Image", {W = inputW, Disabled = not hasPagePrompt}) then
-            -- DEV_MODE: Use existing test image as placeholder
-            page.image_path = "pics/Gemini_Generated_Image_rod070rod070rod0.png"
-            editor.showMessage("Image generated (DEV_MODE)")
+        local hasQuestion = page.question_text and page.question_text ~= ""
+        local canGenerate = hasPagePrompt and hasQuestion
+        if Slab.Button("Generate Image", {W = inputW, Disabled = not canGenerate or state.isGenerating}) then
+            print("[Editor] Generate Image clicked!")
+            print("[Editor] Page image prompt: " .. tostring(page.image_prompt))
+            print("[Editor] Page question: " .. tostring(page.question_text))
+            editor.startImageGeneration(page)
+        end
+        if not hasPagePrompt then
+            Slab.Text("Enter page image prompt", {Color = {0.6, 0.6, 0.6, 1}})
+        elseif not hasQuestion then
+            Slab.Text("Enter question text", {Color = {0.6, 0.6, 0.6, 1}})
         end
     end
 
@@ -1141,15 +1251,13 @@ function editor.loadStory(filename)
         return
     end
 
-    -- Check if this is a legacy story (no cover_image_path before migration)
-    local hadCoverBefore = story.cover_image_path and story.cover_image_path ~= ""
-
     -- Migrate story from old format to new format
     story = schema.migrateStory(story)
 
-    -- Mark as legacy if it didn't have a cover (skip Pages panel gating)
-    if not hadCoverBefore then
-        story._isLegacy = true
+    -- All stories now require cover before editing pages (no legacy exception)
+    -- Expand story settings if no cover so user can generate one
+    if not story.cover_image_path or story.cover_image_path == "" then
+        state.storySettingsExpanded = true
     end
 
     state.story = story
@@ -1175,26 +1283,61 @@ function editor.textinput(text)
 end
 
 function editor.startImageGeneration(page)
+    print("[Editor] startImageGeneration called")
     if state.isGenerating then
+        print("[Editor] Already generating, skipping")
         return
     end
 
     state.isGenerating = true
+    state.generatingCover = false
+    state.generationError = nil
+
+    -- Start the image generation thread
+    print("[Editor] Starting image thread...")
+    state.imageThread = love.thread.newThread("image_thread.lua")
+    state.imageThread:start()
+
+    -- Page image uses ONLY page.image_prompt (no story prompt)
+    local requestChannel = love.thread.getChannel("image_request")
+    local request = {
+        url = BACKEND_URL,
+        description = page.image_prompt or "",
+        question = page.question_text or ""
+    }
+    print("[Editor] Sending request to backend:")
+    print("[Editor]   URL: " .. request.url)
+    print("[Editor]   Description: " .. request.description)
+    print("[Editor]   Question: " .. request.question)
+    requestChannel:push(request)
+
+    editor.showMessage("Generating image...")
+end
+
+function editor.startCoverGeneration()
+    print("[Editor] startCoverGeneration called")
+    if state.isGenerating then
+        print("[Editor] Already generating, skipping")
+        return
+    end
+
+    state.isGenerating = true
+    state.generatingCover = true
     state.generationError = nil
 
     -- Start the image generation thread
     state.imageThread = love.thread.newThread("image_thread.lua")
     state.imageThread:start()
 
-    -- Send the request using story-level prompt combined with question
+    -- Send the request using story prompt and title
     local requestChannel = love.thread.getChannel("image_request")
     requestChannel:push({
         url = BACKEND_URL,
         description = state.story.general_image_prompt or "",
-        question = page.question_text
+        question = "Cover image for story: " .. (state.story.title or "Untitled")
     })
 
-    editor.showMessage("Generating image...")
+    editor.showMessage("Generating cover...")
 end
 
 return editor

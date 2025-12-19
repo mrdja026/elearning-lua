@@ -23,8 +23,19 @@ app.route('/api', storiesRoute);
 
 const port = parseInt(process.env.PORT || '3000');
 
-console.log(`Server starting on port ${port}`);
-console.log(`DEV_MODE: ${process.env.DEV_MODE} (type: ${typeof process.env.DEV_MODE})`);
+console.log('\n============================================');
+console.log('   LogicTales Backend Starting...');
+console.log('============================================');
+console.log(`Port: ${port}`);
+console.log(`DEV_MODE: ${process.env.DEV_MODE?.trim().toLowerCase() === 'true' ? 'ON (mock data)' : 'OFF (live APIs)'}`);
+console.log('');
+console.log('API Keys Status:');
+console.log(`  GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? '✓ Set (' + process.env.GEMINI_API_KEY.substring(0, 8) + '...)' : '✗ MISSING'}`);
+console.log(`  STABILITY_API_KEY: ${process.env.STABILITY_API_KEY ? '✓ Set (' + process.env.STABILITY_API_KEY.substring(0, 8) + '...)' : '✗ MISSING'}`);
+console.log(`  CLOUDINARY_CLOUD_NAME: ${process.env.CLOUDINARY_CLOUD_NAME ? '✓ Set' : '✗ MISSING'}`);
+console.log(`  CLOUDINARY_API_KEY: ${process.env.CLOUDINARY_API_KEY ? '✓ Set' : '✗ MISSING'}`);
+console.log(`  CLOUDINARY_API_SECRET: ${process.env.CLOUDINARY_API_SECRET ? '✓ Set' : '✗ MISSING'}`);
+console.log('============================================\n');
 
 serve({
   fetch: app.fetch,
