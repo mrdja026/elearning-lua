@@ -23,15 +23,4 @@ The system SHALL use the Play screen component to render both story cover and pa
 
 #### Scenario: No cover yet
 - **WHEN** `displayMode` is "STORY" AND no cover image exists
-- **THEN** a placeholder with "Generate cover image" message SHALL be displayed
-
-## MODIFIED Requirements
-
-### Requirement: Center preview panel
-
-The system SHALL display the currently selected content using the Play screen component in preview mode.
-
-#### Scenario: Center preview panel
-- **WHEN** Config mode is active
-- **THEN** the center panel SHALL use PlayScreen.draw() with preview=true
-- **AND** the displayMode SHALL be determined by current selection (story settings vs page)
+- **THEN** a placeholder with "No Cover" message SHALL be displayed
