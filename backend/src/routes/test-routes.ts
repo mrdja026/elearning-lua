@@ -2,6 +2,11 @@ import { Hono } from 'hono';
 import { buildPrompt } from '../services/prompt-builder.js';
 import { generateImage } from '../services/image-generator.js';
 import { uploadImage } from '../services/image-uploader.js';
+import { runResearcher } from '../agents/researcher.js';
+import { runStoryteller } from '../agents/storyteller.js';
+import { runCritic } from '../agents/critic.js';
+import { runPipeline } from '../agents/index.js';
+import type { ResearchData, StoryData, ArtStyle } from '../types/story.js';
 
 export const testRoutes = new Hono();
 
@@ -131,6 +136,181 @@ testRoutes.get('/test-upload', async (c) => {
       success: true,
       imageUrl: result.imageUrl,
       publicId: result.publicId,
+    });
+  } catch (error) {
+    console.error('[TEST] Error:', error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+// ============================================
+// ADK Agent Test Routes
+// ============================================
+
+// Test Researcher agent (Google Search grounding)
+testRoutes.post('/test-researcher', async (c) => {
+  const startTime = Date.now();
+  console.log('\n========================================');
+  console.log('[TEST] POST /api/test-researcher');
+
+  try {
+    const body = await c.req.json<{ topic: string }>();
+
+    if (!body.topic) {
+      return c.json({ error: 'Missing required field: topic' }, 400);
+    }
+
+    console.log(`[TEST] Topic: ${body.topic}`);
+
+    const result = await runResearcher(body.topic);
+
+    console.log(`[TEST] Completed in ${Date.now() - startTime}ms`);
+    console.log('========================================\n');
+
+    return c.json({
+      success: true,
+      facts: result.facts,
+      sourceUrls: result.sourceUrls,
+      tokens: {
+        input: result.inputTokens,
+        output: result.outputTokens,
+      },
+      durationMs: result.durationMs,
+    });
+  } catch (error) {
+    console.error('[TEST] Error:', error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+// Test Storyteller agent
+testRoutes.post('/test-storyteller', async (c) => {
+  const startTime = Date.now();
+  console.log('\n========================================');
+  console.log('[TEST] POST /api/test-storyteller');
+
+  try {
+    const body = await c.req.json<{
+      researchData: ResearchData;
+      artStyle?: ArtStyle;
+      topic?: string;
+    }>();
+
+    if (!body.researchData || !body.researchData.facts) {
+      return c.json({ error: 'Missing required field: researchData.facts' }, 400);
+    }
+
+    const artStyle = body.artStyle || 'fantasy';
+    const topic = body.topic || 'Amazing Science';
+
+    console.log(`[TEST] Topic: ${topic}`);
+    console.log(`[TEST] Art style: ${artStyle}`);
+    console.log(`[TEST] Facts: ${body.researchData.facts.length}`);
+
+    const result = await runStoryteller(body.researchData, artStyle, topic);
+
+    console.log(`[TEST] Completed in ${Date.now() - startTime}ms`);
+    console.log('========================================\n');
+
+    return c.json({
+      success: true,
+      storyData: result.storyData,
+      tokens: {
+        input: result.inputTokens,
+        output: result.outputTokens,
+      },
+      durationMs: result.durationMs,
+    });
+  } catch (error) {
+    console.error('[TEST] Error:', error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+// Test Critic agent
+testRoutes.post('/test-critic', async (c) => {
+  const startTime = Date.now();
+  console.log('\n========================================');
+  console.log('[TEST] POST /api/test-critic');
+
+  try {
+    const body = await c.req.json<{
+      storyData: StoryData;
+      researchData?: ResearchData;
+    }>();
+
+    if (!body.storyData || !body.storyData.title) {
+      return c.json({ error: 'Missing required field: storyData' }, 400);
+    }
+
+    // Default research data if not provided
+    const researchData = body.researchData || {
+      facts: ['This is a test fact.'],
+      sourceUrls: [],
+    };
+
+    console.log(`[TEST] Story: ${body.storyData.title}`);
+    console.log(`[TEST] Pages: ${body.storyData.pages?.length || 0}`);
+
+    const result = await runCritic(body.storyData, researchData);
+
+    console.log(`[TEST] Completed in ${Date.now() - startTime}ms`);
+    console.log('========================================\n');
+
+    return c.json({
+      success: true,
+      review: result.review,
+      tokens: {
+        input: result.inputTokens,
+        output: result.outputTokens,
+      },
+      durationMs: result.durationMs,
+    });
+  } catch (error) {
+    console.error('[TEST] Error:', error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+// Test full pipeline (Researcher → Storyteller → Critic)
+testRoutes.post('/test-pipeline', async (c) => {
+  const startTime = Date.now();
+  console.log('\n========================================');
+  console.log('[TEST] POST /api/test-pipeline');
+
+  try {
+    const body = await c.req.json<{
+      topic: string;
+      artStyle?: ArtStyle;
+    }>();
+
+    if (!body.topic) {
+      return c.json({ error: 'Missing required field: topic' }, 400);
+    }
+
+    const artStyle = body.artStyle || 'fantasy';
+
+    console.log(`[TEST] Topic: ${body.topic}`);
+    console.log(`[TEST] Art style: ${artStyle}`);
+
+    const result = await runPipeline(body.topic, artStyle);
+
+    console.log(`[TEST] Completed in ${Date.now() - startTime}ms`);
+    console.log('========================================\n');
+
+    return c.json({
+      success: true,
+      story: {
+        title: result.story.title,
+        topic: result.story.topic,
+        pages: result.story.pages,
+      },
+      research: {
+        facts: result.research.facts,
+        sourceUrls: result.research.sourceUrls,
+      },
+      review: result.review,
+      metadata: result.metadata,
     });
   } catch (error) {
     console.error('[TEST] Error:', error);

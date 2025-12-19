@@ -27,10 +27,17 @@ local state = {
     availableFiles = {},
     generatingCover = false,  -- Track if generating cover vs page image
     selectedFileIndex = 1,
+    -- Load Saved dialog state
+    showLoadSavedDialog = false,
+    savedFiles = {},
+    selectedSavedFileIndex = 1,
     -- Image generation state
     isGenerating = false,
     imageThread = nil,
     generationError = nil,
+    -- Download state for loading remote URLs
+    downloadThread = nil,
+    pendingDownloads = 0,
     -- Storybook UI state
     storySettingsExpanded = false
 }
@@ -112,6 +119,35 @@ function editor.update(dt)
             end
         end
     end
+
+    -- Check for download responses (from loading saved stories with remote URLs)
+    if state.pendingDownloads > 0 then
+        local downloadChannel = love.thread.getChannel("download_response")
+        local response = downloadChannel:pop()
+        if response then
+            state.pendingDownloads = state.pendingDownloads - 1
+            if response.success then
+                print("[Editor] Downloaded: " .. response.originalUrl .. " -> " .. response.localPath)
+                -- Update the appropriate field
+                if response.targetField == "cover" then
+                    state.story.cover_image_path = response.localPath
+                    ImageCard.invalidateCache(response.originalUrl)
+                elseif type(response.targetField) == "number" then
+                    local page = state.story.pages[response.targetField]
+                    if page then
+                        page.image_path = response.localPath
+                        ImageCard.invalidateCache(response.originalUrl)
+                    end
+                end
+                if state.pendingDownloads == 0 then
+                    editor.showMessage("All images downloaded!")
+                end
+            else
+                print("[Editor] Download failed: " .. (response.error or "unknown"))
+                editor.showMessage("Download failed: " .. (response.error or "unknown"))
+            end
+        end
+    end
 end
 
 function editor.draw()
@@ -138,105 +174,18 @@ function editor.draw()
     end
 end
 
--- Draw the center preview panel using PlayScreen component
+-- Draw modal dialogs on top of everything (called from main.lua AFTER Slab.Draw)
+function editor.drawModalDialogs()
+    if state.showLoadSavedDialog then
+        editor.drawLoadSavedDialog()
+    end
+end
+
+-- Center preview panel is now drawn by drawCenterPreview() in main.lua
+-- This function is kept for compatibility but does nothing
 function editor.drawPreviewPanel()
-    local layout = Layout.getConfigLayout()
-    local panel = layout.previewPanel
-
-    -- Draw panel background
-    love.graphics.setColor(Tokens.COLORS.surface)
-    love.graphics.rectangle("fill", panel.x, panel.y, panel.width, panel.height, 8)
-
-    -- Draw border
-    love.graphics.setColor(Tokens.COLORS.surface_elevated)
-    love.graphics.setLineWidth(2)
-    love.graphics.rectangle("line", panel.x, panel.y, panel.width, panel.height, 8)
-    love.graphics.setLineWidth(1)
-
-    -- Determine display mode based on selection
-    local displayMode
-    local label
-
-    if state.selectedPageIndex == 0 then
-        -- Page-Story selected: show cover in STORY mode
-        displayMode = PlayScreen.MODE_STORY
-        label = "Story Cover"
-    else
-        -- Regular page selected: show page in PAGE mode
-        displayMode = PlayScreen.MODE_PAGE
-        label = "Page " .. state.selectedPageIndex .. " Preview"
-    end
-
-    -- Draw label at top
-    love.graphics.setColor(Tokens.COLORS.text_secondary)
-    local labelX = panel.x + panel.padding
-    local labelY = panel.y + 10
-    love.graphics.print(label, labelX, labelY)
-
-    -- Calculate preview area bounds (below label)
-    local bounds = {
-        x = panel.x + panel.padding,
-        y = panel.y + 35,
-        width = panel.width - panel.padding * 2,
-        height = panel.height - 50
-    }
-
-    -- Use PlayScreen to render preview with appropriate mode
-    if displayMode == PlayScreen.MODE_STORY then
-        -- STORY mode: pass the story directly
-        PlayScreen.draw(state.story, nil, {
-            mode = PlayScreen.MODE_STORY,
-            preview = true,
-            bounds = bounds
-        })
-    else
-        -- PAGE mode: create a minimal gamestate for preview
-        local previewGamestate = {
-            getCurrentPage = function()
-                return state.story.pages[state.selectedPageIndex]
-            end,
-            getStory = function()
-                return state.story
-            end
-        }
-
-        -- For PAGE mode in preview, just draw the image (not the full play layout)
-        local page = state.story.pages[state.selectedPageIndex]
-        local imagePath = page and page.image_path or ""
-
-        -- Draw image preview area
-        love.graphics.setColor(Tokens.COLORS.surface_elevated)
-        love.graphics.rectangle("fill", bounds.x, bounds.y, bounds.width, bounds.height, 4)
-
-        local image = nil
-        if imagePath and imagePath ~= "" then
-            image = ImageCard.loadImage(imagePath)
-        end
-
-        if image then
-            local scaleX = bounds.width / image:getWidth()
-            local scaleY = bounds.height / image:getHeight()
-            local scale = math.min(scaleX, scaleY)
-
-            local drawW = image:getWidth() * scale
-            local drawH = image:getHeight() * scale
-            local drawX = bounds.x + (bounds.width - drawW) / 2
-            local drawY = bounds.y + (bounds.height - drawH) / 2
-
-            love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.draw(image, drawX, drawY, 0, scale, scale)
-        else
-            love.graphics.setColor(Tokens.COLORS.text_disabled)
-            local placeholder = imagePath == "" and "[No Image - Generate one!]" or "[Image not found]"
-            local font = love.graphics.getFont()
-            local textW = font:getWidth(placeholder)
-            local textX = bounds.x + (bounds.width - textW) / 2
-            local textY = bounds.y + bounds.height / 2 - 8
-            love.graphics.print(placeholder, textX, textY)
-        end
-    end
-
-    love.graphics.setColor(1, 1, 1, 1)
+    -- Preview is handled by drawCenterPreview() in main.lua which draws on top
+    -- of Slab windows for proper z-ordering
 end
 
 function editor.drawFilePanel()
@@ -267,6 +216,13 @@ function editor.drawFilePanel()
     Slab.SameLine()
     if Slab.Button("Save", {W = 80}) then
         editor.saveStory()
+    end
+
+    Slab.SameLine()
+    if Slab.Button("Load Saved", {W = 100}) then
+        state.showLoadSavedDialog = true
+        state.savedFiles = editor.getSavedStoryFiles()
+        state.selectedSavedFileIndex = 1
     end
 
     Slab.SameLine()
@@ -558,6 +514,155 @@ function editor.drawLoadDialog()
     Slab.EndWindow()
 end
 
+function editor.drawLoadSavedDialog()
+    local winW, winH = love.graphics.getDimensions()
+    local dialogW, dialogH = 450, 380
+    local dialogX = (winW - dialogW) / 2
+    local dialogY = (winH - dialogH) / 2
+
+    -- Draw dark overlay behind dialog
+    love.graphics.setColor(0, 0, 0, 0.7)
+    love.graphics.rectangle("fill", 0, 0, winW, winH)
+
+    -- Draw dialog background
+    love.graphics.setColor(0.15, 0.15, 0.2, 1)
+    love.graphics.rectangle("fill", dialogX, dialogY, dialogW, dialogH, 8)
+
+    -- Draw dialog border
+    love.graphics.setColor(0.4, 0.4, 0.5, 1)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", dialogX, dialogY, dialogW, dialogH, 8)
+    love.graphics.setLineWidth(1)
+
+    -- Draw title bar
+    love.graphics.setColor(0.2, 0.2, 0.3, 1)
+    love.graphics.rectangle("fill", dialogX, dialogY, dialogW, 40, 8)
+
+    -- Title text
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("Load Generated Story", dialogX + 15, dialogY + 12)
+
+    -- Content area
+    local contentX = dialogX + 20
+    local contentY = dialogY + 50
+    local contentW = dialogW - 40
+
+    if #state.savedFiles == 0 then
+        love.graphics.setColor(0.7, 0.7, 0.7, 1)
+        love.graphics.print("No saved stories found in saves/", contentX, contentY)
+        love.graphics.print("Run e2eADKFlow.sh to generate stories.", contentX, contentY + 25)
+    else
+        love.graphics.setColor(0.8, 0.8, 0.8, 1)
+        love.graphics.print("Select a story to load:", contentX, contentY)
+
+        -- File list
+        local listY = contentY + 30
+        local itemH = 35
+        for i, f in ipairs(state.savedFiles) do
+            local itemY = listY + (i - 1) * itemH
+            local displayName = f:gsub("%.json$", ""):gsub("_", " ")
+
+            -- Highlight selected item
+            if i == state.selectedSavedFileIndex then
+                love.graphics.setColor(0.3, 0.4, 0.6, 1)
+                love.graphics.rectangle("fill", contentX, itemY, contentW, itemH - 5, 4)
+            end
+
+            -- Item text
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.print(displayName, contentX + 10, itemY + 8)
+
+            -- Check for click on item
+            local mx, my = love.mouse.getPosition()
+            if love.mouse.isDown(1) and
+               mx >= contentX and mx <= contentX + contentW and
+               my >= itemY and my <= itemY + itemH then
+                state.selectedSavedFileIndex = i
+            end
+        end
+    end
+
+    -- Buttons at bottom
+    local btnW, btnH = 120, 40
+    local btnY = dialogY + dialogH - 60
+    local btnGap = 20
+    local totalBtnW = btnW * 2 + btnGap
+    local btnStartX = dialogX + (dialogW - totalBtnW) / 2
+
+    -- Load button
+    local loadBtnX = btnStartX
+    love.graphics.setColor(0.2, 0.5, 0.3, 1)
+    love.graphics.rectangle("fill", loadBtnX, btnY, btnW, btnH, 6)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("Load", loadBtnX + 42, btnY + 12)
+
+    -- Cancel button
+    local cancelBtnX = btnStartX + btnW + btnGap
+    love.graphics.setColor(0.5, 0.3, 0.3, 1)
+    love.graphics.rectangle("fill", cancelBtnX, btnY, btnW, btnH, 6)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("Cancel", cancelBtnX + 35, btnY + 12)
+
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Handle mouse clicks for the custom dialog
+function editor.handleLoadSavedDialogClick(x, y)
+    if not state.showLoadSavedDialog then return false end
+
+    local winW, winH = love.graphics.getDimensions()
+    local dialogW, dialogH = 450, 380
+    local dialogX = (winW - dialogW) / 2
+    local dialogY = (winH - dialogH) / 2
+
+    -- Check if click is outside dialog (close it)
+    if x < dialogX or x > dialogX + dialogW or y < dialogY or y > dialogY + dialogH then
+        state.showLoadSavedDialog = false
+        return true
+    end
+
+    -- Button positions
+    local btnW, btnH = 120, 40
+    local btnY = dialogY + dialogH - 60
+    local btnGap = 20
+    local totalBtnW = btnW * 2 + btnGap
+    local btnStartX = dialogX + (dialogW - totalBtnW) / 2
+
+    -- Load button click
+    local loadBtnX = btnStartX
+    if x >= loadBtnX and x <= loadBtnX + btnW and y >= btnY and y <= btnY + btnH then
+        if #state.savedFiles > 0 then
+            print("[Editor] Load clicked, file: " .. state.savedFiles[state.selectedSavedFileIndex])
+            editor.loadSavedStory(state.savedFiles[state.selectedSavedFileIndex])
+        end
+        state.showLoadSavedDialog = false
+        return true
+    end
+
+    -- Cancel button click
+    local cancelBtnX = btnStartX + btnW + btnGap
+    if x >= cancelBtnX and x <= cancelBtnX + btnW and y >= btnY and y <= btnY + btnH then
+        print("[Editor] Cancel clicked")
+        state.showLoadSavedDialog = false
+        return true
+    end
+
+    -- File list click
+    local contentX = dialogX + 20
+    local contentY = dialogY + 50 + 30
+    local contentW = dialogW - 40
+    local itemH = 35
+    for i, _ in ipairs(state.savedFiles) do
+        local itemY = contentY + (i - 1) * itemH
+        if x >= contentX and x <= contentX + contentW and y >= itemY and y <= itemY + itemH then
+            state.selectedSavedFileIndex = i
+            return true
+        end
+    end
+
+    return true  -- Consume click inside dialog
+end
+
 -- ============================================
 -- NEW STORYBOOK LAYOUT PANELS
 -- ============================================
@@ -840,6 +945,18 @@ function editor.drawStorySettingsHeader()
         Slab.SameLine()
         if Slab.Button("Save", {W = 55}) then
             editor.saveStory()
+        end
+        Slab.SameLine()
+        if Slab.Button("Load", {W = 55}) then
+            print("[Editor] Load button clicked")
+            state.savedFiles = editor.getSavedStoryFiles()
+            if #state.savedFiles == 0 then
+                editor.showMessage("No saved stories found in saves/")
+            else
+                state.showLoadSavedDialog = true
+                state.selectedSavedFileIndex = 1
+                print("[Editor] Opening Load Saved dialog with " .. #state.savedFiles .. " files")
+            end
         end
         Slab.SameLine()
         if Slab.Button("Test", {W = 55}) then
@@ -1212,6 +1329,27 @@ function editor.getStoryFiles()
     return files
 end
 
+function editor.getSavedStoryFiles()
+    local files = {}
+    local info = love.filesystem.getInfo("saves")
+    if not info then
+        print("[Editor] saves/ directory not found in filesystem")
+        return files
+    end
+    print("[Editor] saves/ directory found, scanning...")
+    local items = love.filesystem.getDirectoryItems("saves")
+    for _, item in ipairs(items) do
+        print("[Editor] Found item: " .. item)
+        if item:match("%.json$") then
+            table.insert(files, item)
+        end
+    end
+    -- Sort by newest first (filenames contain timestamps)
+    table.sort(files, function(a, b) return a > b end)
+    print("[Editor] Total JSON files: " .. #files)
+    return files
+end
+
 function editor.saveStory()
     local valid, err = schema.validateStory(state.story)
     if not valid then
@@ -1264,6 +1402,97 @@ function editor.loadStory(filename)
     state.selectedPageIndex = 1
     state.isDirty = false
     editor.showMessage("Loaded " .. filename)
+end
+
+-- Helper to check if a path is a remote URL
+local function isRemoteUrl(path)
+    return path and (path:match("^https?://") ~= nil)
+end
+
+-- Start download thread if not running
+local function ensureDownloadThread()
+    if not state.downloadThread or not state.downloadThread:isRunning() then
+        state.downloadThread = love.thread.newThread("download_thread.lua")
+        state.downloadThread:start()
+        print("[Editor] Download thread started")
+    end
+end
+
+-- Queue a URL for download
+local function queueDownload(url, targetField)
+    ensureDownloadThread()
+    local requestChannel = love.thread.getChannel("download_request")
+    requestChannel:push({
+        url = url,
+        targetField = targetField
+    })
+    state.pendingDownloads = state.pendingDownloads + 1
+    print("[Editor] Queued download: " .. url .. " for " .. tostring(targetField))
+end
+
+function editor.loadSavedStory(filename)
+    print("[Editor] Loading saved story: " .. filename)
+    local path = "saves/" .. filename
+    local content, err = love.filesystem.read(path)
+    if not content then
+        print("[Editor] Error reading file: " .. (err or "unknown"))
+        editor.showMessage("Error: " .. (err or "unknown"))
+        return
+    end
+    print("[Editor] File read successfully, size: " .. #content)
+
+    local success, story = pcall(json.decode, content)
+    if not success then
+        print("[Editor] JSON parse error: " .. tostring(story))
+        editor.showMessage("Error parsing JSON")
+        return
+    end
+    print("[Editor] JSON parsed successfully")
+    print("[Editor] Title: " .. (story.title or "no title"))
+    print("[Editor] Pages: " .. (story.pages and #story.pages or 0))
+
+    -- Migrate story from old format to new format
+    story = schema.migrateStory(story)
+
+    -- Saved stories should already have cover images from generation
+    if not story.cover_image_path or story.cover_image_path == "" then
+        state.storySettingsExpanded = true
+        print("[Editor] No cover image, expanding settings")
+    else
+        state.storySettingsExpanded = false
+        print("[Editor] Cover image found: " .. story.cover_image_path)
+    end
+
+    state.story = story
+    state.selectedPageIndex = 1
+    state.isDirty = false
+    state.pendingDownloads = 0
+    print("[Editor] Story loaded into state")
+
+    -- Check for remote URLs and queue downloads
+    local downloadCount = 0
+
+    -- Check cover image
+    if isRemoteUrl(story.cover_image_path) then
+        queueDownload(story.cover_image_path, "cover")
+        downloadCount = downloadCount + 1
+    end
+
+    -- Check page images
+    if story.pages then
+        for i, page in ipairs(story.pages) do
+            if isRemoteUrl(page.image_path) then
+                queueDownload(page.image_path, i)
+                downloadCount = downloadCount + 1
+            end
+        end
+    end
+
+    if downloadCount > 0 then
+        editor.showMessage("Downloading " .. downloadCount .. " images...")
+    else
+        editor.showMessage("Loaded: " .. (story.title or filename))
+    end
 end
 
 function editor.getStory()

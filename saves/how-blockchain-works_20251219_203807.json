@@ -1,0 +1,66 @@
+{
+  "title": "Maya's Adventure: how blockchain works",
+  "topic": "how blockchain works",
+  "general_image_prompt": "Imagine you're Maya, a tech-savvy teenager living in a city where a new, highly secure digital currency called 'ChronoCoin' is about to launch. ChronoCoin promises to revolutionize local transactions, making them faster and more transparent than ever before. But there's a catch: the city's old guard, who control traditional banking systems, are spreading rumors and fear, claiming ChronoCoin is too complex, too risky, and designed for criminals. Your younger sibling, Leo, who is fascinated by the idea of this new currency, is confused by the conflicting information. Your mission, as Maya, is to not only understand ChronoCoin inside and out – how its 'blocks' of transactions are chained together, how 'mining' verifies them, and why it's so difficult to tamper with – but also to explain it clearly and convincingly to Leo, your friends, and eventually, to the skeptical community. You'll need to overcome technical jargon, perhaps even deal with a minor digital 'glitch' that sparks further public doubt, and ultimately demonstrate the power and potential of this decentralized technology. What challenges will you face in unraveling the mysteries of ChronoCoin, and how will you build trust in a system most people don't yet understand?",
+  "cover_image_path": "images/cover_blockchain.png",
+  "target_age": "13-17",
+  "art_style": "pixel",
+  "pages": [
+    {
+      "id": 1,
+      "image_path": "images/page1_blockchain.png",
+      "image_prompt": "Pixel art illustration, a wide-eyed child with a friendly smile, peering intently at a magical, glowing pixelated blockchain network floating in a bright, cheerful classroom. The child is holding a small, shimmering pixel block, adding it to the chain. The background features colorful, simplified diagrams of connected blocks. Sunlight streams in from a window, illuminating the scene with a warm, educational glow. Masterpiece, highly detailed, best quality, vibrant colors, sharp focus.",
+      "question_text": "Are you sure?",
+      "hint_text": "yes",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    },
+    {
+      "id": 2,
+      "image_path": "images/page2_blockchain.png",
+      "image_prompt": "Pixel art illustration, masterpiece, best quality, Maya, a cheerful and bright high school student with glasses and a friendly smile, points enthusiastically at a vibrant, interconnected pixelated network representing a blockchain. She's surrounded by glowing, abstract blocks containing simple icons like locks and keys. The background is a clean, light blue grid. She is clearly explaining complex ideas in a simple, engaging way. Intricate details, sharp focus, vibrant colors, professional, stunning.",
+      "question_text": "Are you sure?",
+      "hint_text": "yes",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    },
+    {
+      "id": 3,
+      "image_path": "images/page3_blockchain.png",
+      "image_prompt": "Pixel art illustration, masterpiece, best quality. A vibrant pixelated scene depicting a joyous celebration of learning about blockchain. Cheerful, diverse cartoon children holding colorful pixelated blocks representing data, connecting them in a chain. A friendly, simplified blockchain visual with glowing nodes in the background. Bright, sunny lighting, a sense of accomplishment and wonder. Highly detailed, intricate details, sharp focus, professional, stunning, vibrant colors.",
+      "question_text": "Are you sure?",
+      "hint_text": "yes",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    }
+  ],
+  "generation": {
+    "source": "ai",
+    "grounded_facts": [
+      "Decentralization",
+      "Transparency",
+      "Digital Security",
+      "Community Trust",
+      "Technological Literacy"
+    ],
+    "source_urls": [],
+    "timestamp": "2025-12-19T19:39:05.268Z"
+  },
+  "critic_review": {
+    "approved": true,
+    "warnings": [],
+    "readabilityScore": 85
+  }
+}
