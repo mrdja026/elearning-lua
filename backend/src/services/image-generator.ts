@@ -12,7 +12,7 @@ export async function generateImage(
   const startTime = Date.now();
 
   // DEV_MODE: Skip Stability AI call, return empty base64 (uploader will return mock URL)
-  if (process.env.DEV_MODE === 'true') {
+  if (process.env.DEV_MODE?.trim().toLowerCase() === 'true') {
     console.log('[ImageGenerator] DEV_MODE: Skipping Stability AI call');
     return {
       base64Image: '',
@@ -21,6 +21,12 @@ export async function generateImage(
   }
 
   console.log('[ImageGenerator] Calling Stability AI Core...');
+  console.log(`[ImageGenerator] Prompt: ${prompt.substring(0, 80)}...`);
+  console.log(`[ImageGenerator] Negative: ${negativePrompt.substring(0, 60)}...`);
+
+  if (!process.env.STABILITY_API_KEY) {
+    throw new Error('STABILITY_API_KEY is not set!');
+  }
 
   const formData = new FormData();
   formData.append('prompt', prompt);
@@ -28,19 +34,28 @@ export async function generateImage(
   formData.append('output_format', 'png');
   formData.append('aspect_ratio', '3:2'); // Landscape format
 
-  const response = await fetch(STABILITY_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.STABILITY_API_KEY}`,
-      'Accept': 'image/*',
-    },
-    body: formData,
-  });
+  let response;
+  try {
+    response = await fetch(STABILITY_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.STABILITY_API_KEY}`,
+        'Accept': 'image/*',
+      },
+      body: formData,
+    });
+  } catch (err) {
+    console.error('[ImageGenerator] Network error calling Stability AI!');
+    console.error('[ImageGenerator] Error:', err instanceof Error ? err.message : err);
+    throw new Error(`Stability AI network error: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('[ImageGenerator] Error:', response.status, errorText);
-    throw new Error(`Stability AI error: ${response.status} - ${errorText}`);
+    console.error('[ImageGenerator] API Error!');
+    console.error(`[ImageGenerator] Status: ${response.status}`);
+    console.error(`[ImageGenerator] Response: ${errorText}`);
+    throw new Error(`Stability AI error ${response.status}: ${errorText}`);
   }
 
   const arrayBuffer = await response.arrayBuffer();
@@ -49,8 +64,8 @@ export async function generateImage(
 
   const durationMs = Date.now() - startTime;
 
-  console.log(`[ImageGenerator] Completed in ${durationMs}ms`);
-  console.log(`[ImageGenerator] Image size: ${buffer.length} bytes`);
+  console.log(`[ImageGenerator] Success! Completed in ${durationMs}ms`);
+  console.log(`[ImageGenerator] Image size: ${buffer.length} bytes (${(buffer.length / 1024).toFixed(1)} KB)`);
 
   return {
     base64Image,

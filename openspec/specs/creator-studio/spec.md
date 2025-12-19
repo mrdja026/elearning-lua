@@ -45,27 +45,47 @@ The system SHALL support switching between Play mode and Create mode.
 
 ### Requirement: Split View Layout
 
-The system SHALL display a split-view layout in Create mode with editor on the left and preview on the right, optimized for 1280×720 virtual resolution.
+The system SHALL display a preview-centric layout in Create mode with page thumbnails on the left, large preview in the center, and control deck on the right, optimized for 1280x720 virtual resolution.
 
 #### Scenario: Fixed virtual resolution
 - **WHEN** the application starts
-- **THEN** the virtual resolution SHALL be 1280×720 pixels with integer scaling to window
+- **THEN** the virtual resolution SHALL be 1280x720 pixels with integer scaling to window
 
-#### Scenario: Three-column layout
+#### Scenario: Three-column storybook layout
 - **WHEN** Config mode is active
-- **THEN** the layout SHALL be: pages panel (180px left), editor panel (500px center), preview panel (400px right)
+- **THEN** the layout SHALL be: page thumbnails panel (150px left), preview panel (center, remaining width), control deck panel (300px right)
 
-#### Scenario: Top bar
+#### Scenario: Page thumbnails panel
 - **WHEN** Config mode is active
-- **THEN** a 60px top bar SHALL display file operations (New/Load/Save) on left, story title center, and Test Play/Settings on right
+- **THEN** the left panel SHALL display visual thumbnail cards for each page with placeholder images
+
+#### Scenario: Center preview panel
+- **WHEN** Config mode is active
+- **THEN** the center panel SHALL display the currently selected page at maximum scale that fits the available space
+
+#### Scenario: Control deck panel
+- **WHEN** Config mode is active
+- **THEN** the right panel SHALL contain all page editor fields (question text, hint, image path, question type configuration)
+
+#### Scenario: Collapsible story settings
+- **WHEN** Config mode is active
+- **THEN** the top of the control deck SHALL display a collapsible "Story Settings" header containing title, topic, and general image prompt fields
+
+#### Scenario: Dream It button bar
+- **WHEN** Config mode is active
+- **THEN** a 70px bottom bar SHALL display a prominent "Dream It" button for AI image generation
+
+#### Scenario: Semi-transparent panels
+- **WHEN** Config mode is active
+- **THEN** all Slab windows SHALL use semi-transparent backgrounds (alpha 0.85-0.90) to reveal decorations beneath
 
 #### Scenario: Status bar
 - **WHEN** Config mode is active
-- **THEN** a 40px status bar SHALL display at bottom for generation feedback
+- **THEN** status messages SHALL appear as toast notifications overlaid on the interface
 
 #### Scenario: Preview rendering
 - **WHEN** Config mode is active
-- **THEN** the preview panel SHALL render the currently selected page at 0.48x scale
+- **THEN** the preview panel SHALL render the currently selected page scaled to fit center area with visible border
 
 ### Requirement: Story Editor
 
@@ -434,4 +454,69 @@ The system SHALL support keyboard and controller navigation in Play mode.
 #### Scenario: Visual focus indicator
 - **WHEN** an element is focused
 - **THEN** it SHALL display a visible focus ring using accent color and heavy border
+
+### Requirement: Page Thumbnails
+
+The system SHALL display visual thumbnail representations of story pages in the left sidebar.
+
+#### Scenario: Thumbnail display
+- **WHEN** viewing the pages panel
+- **THEN** each page SHALL be displayed as a visual card with placeholder image and page number
+
+#### Scenario: Thumbnail selection
+- **WHEN** the user clicks a page thumbnail
+- **THEN** that page SHALL become selected and appear in the center preview
+
+#### Scenario: Thumbnail placeholder
+- **WHEN** a page has no generated image
+- **THEN** the thumbnail SHALL display a hardcoded placeholder image
+
+#### Scenario: Selected thumbnail highlight
+- **WHEN** a page is selected
+- **THEN** its thumbnail SHALL be visually highlighted with primary color border
+
+### Requirement: Dream It Button
+
+The system SHALL provide a prominent button for triggering AI image generation.
+
+#### Scenario: Button placement
+- **WHEN** Config mode is active
+- **THEN** the "Dream It" button SHALL be displayed in a dedicated bottom bar, centered horizontally
+
+#### Scenario: Button triggers generation
+- **WHEN** the user clicks "Dream It"
+- **THEN** the system SHALL trigger image generation for the currently selected page using the story-level image prompt
+
+#### Scenario: Button disabled during generation
+- **WHEN** image generation is in progress
+- **THEN** the "Dream It" button SHALL be disabled and display "Generating..." text
+
+#### Scenario: Prompt required validation
+- **WHEN** the user clicks "Dream It" AND general_image_prompt is empty
+- **THEN** a warning message SHALL indicate the user must set the story-level prompt first
+
+### Requirement: Unified Preview Display
+
+The system SHALL use the Play screen component to render both story cover and page images in the config preview panel, distinguished by display mode.
+
+#### Scenario: Preview display mode selection
+- **WHEN** Config mode is active
+- **THEN** the preview panel SHALL use PlayScreen with `displayMode` parameter
+- **AND** `displayMode` SHALL be "STORY" when viewing story settings with a cover image
+- **AND** `displayMode` SHALL be "PAGE" when viewing a specific page
+
+#### Scenario: Story mode preview
+- **WHEN** `displayMode` is "STORY"
+- **THEN** the preview SHALL display the story cover image centered
+- **AND** the story title SHALL be displayed
+- **AND** the story topic SHALL be displayed if set
+
+#### Scenario: Page mode preview
+- **WHEN** `displayMode` is "PAGE"
+- **THEN** the preview SHALL display the currently selected page image
+- **AND** existing page preview behavior SHALL be maintained
+
+#### Scenario: No cover yet
+- **WHEN** `displayMode` is "STORY" AND no cover image exists
+- **THEN** a placeholder with "No Cover" message SHALL be displayed
 

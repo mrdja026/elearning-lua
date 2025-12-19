@@ -7,6 +7,7 @@ function schema.createPage(data)
     return {
         id = data.id,
         image_path = data.image_path or "",
+        image_prompt = data.image_prompt or "",  -- Per-page prompt (overrides story prompt)
         question_text = data.question_text or "",
         hint_text = data.hint_text or "",
         choice_labels = data.choice_labels or DEFAULT_CHOICE_LABELS,
@@ -55,6 +56,11 @@ function schema.getQuestionTypes()
     return QUESTION_TYPES
 end
 
+-- Check if story has a Story Frame (cover image)
+function schema.hasStoryFrame(story)
+    return story.cover_image_path and story.cover_image_path ~= ""
+end
+
 function schema.validateStory(story)
     if not story.pages or #story.pages == 0 then
         return false, "Story has no pages"
@@ -77,6 +83,7 @@ function schema.migrateStory(story)
     -- Add story-level fields if missing
     story.topic = story.topic or ""
     story.general_image_prompt = story.general_image_prompt or ""
+    story.cover_image_path = story.cover_image_path or ""  -- Story Frame cover image
 
     -- Migrate each page
     for _, page in ipairs(story.pages or {}) do
@@ -102,6 +109,9 @@ function schema.migrateStory(story)
         else
             page.choice_labels = {"Yes", "No"}
         end
+
+        -- Ensure image_prompt exists (new field for per-page prompts)
+        page.image_prompt = page.image_prompt or ""
 
         -- Remove deprecated fields
         page.variable_name = nil

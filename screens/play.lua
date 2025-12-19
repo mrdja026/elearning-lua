@@ -9,8 +9,13 @@ local InputManager = require("ui.input_manager")
 local ImageCard = require("components.image_card")
 local QuestionPanel = require("components.question_panel")
 local StatusBar = require("components.status_bar")
+local schema = require("schema")
 
 local PlayScreen = {}
+
+-- Display modes for unified preview
+PlayScreen.MODE_PAGE = "PAGE"   -- Show page image + question
+PlayScreen.MODE_STORY = "STORY" -- Show story cover/frame
 
 -- Screen state
 local state = {
@@ -18,6 +23,7 @@ local state = {
     statusMessage = "",
     statusType = "info",
     statusTimer = 0,
+    showingStoryFrame = false,  -- Story Frame intro screen state
 }
 
 -- Initialize play screen
@@ -34,8 +40,15 @@ function PlayScreen.enter(gamestate)
     state.statusMessage = ""
     state.statusType = "info"
 
-    -- Register answer buttons as focusable
-    PlayScreen.registerFocusables(gamestate)
+    -- Check if story has a Story Frame (cover image)
+    local story = gamestate.getStory and gamestate.getStory() or nil
+    if story and schema.hasStoryFrame(story) then
+        state.showingStoryFrame = true
+    else
+        state.showingStoryFrame = false
+        -- Register answer buttons as focusable only if not showing Story Frame
+        PlayScreen.registerFocusables(gamestate)
+    end
 end
 
 -- Exit play screen
@@ -149,6 +162,25 @@ function PlayScreen.setCallbacks(callbacks)
     PlayScreen.submitCallback = callbacks.onSubmit
 end
 
+-- Check if currently showing Story Frame
+function PlayScreen.isShowingStoryFrame()
+    return state.showingStoryFrame
+end
+
+-- Dismiss Story Frame and proceed to Page 1
+function PlayScreen.dismissStoryFrame(gamestate)
+    if state.showingStoryFrame then
+        state.showingStoryFrame = false
+        -- Register focusables now that we're entering actual gameplay
+        PlayScreen.registerFocusables(gamestate)
+    end
+end
+
+-- Draw Story Frame intro screen (legacy function, now delegates to drawStoryContent)
+function PlayScreen.drawStoryFrame(story)
+    PlayScreen.drawStoryContent(story, nil, false)
+end
+
 -- Show status message
 function PlayScreen.showStatus(message, msgType, duration)
     state.statusMessage = message or ""
@@ -172,7 +204,29 @@ function PlayScreen.update(dt, gamestate)
 end
 
 -- Draw play screen
-function PlayScreen.draw(gamestate, renderer)
+-- options: { mode = "PAGE" | "STORY", preview = bool, bounds = {x,y,w,h} }
+-- Legacy signature: PlayScreen.draw(gamestate, renderer, previewMode) still works
+function PlayScreen.draw(gamestate, renderer, optionsOrPreviewMode)
+    -- Handle legacy signature
+    local options = {}
+    if type(optionsOrPreviewMode) == "table" then
+        options = optionsOrPreviewMode
+    else
+        options.preview = optionsOrPreviewMode
+    end
+
+    local displayMode = options.mode or PlayScreen.MODE_PAGE
+    local previewMode = options.preview or false
+    local bounds = options.bounds  -- Optional custom bounds for preview panel
+
+    -- If STORY mode, draw the story frame
+    if displayMode == PlayScreen.MODE_STORY then
+        local story = gamestate.getStory and gamestate.getStory() or gamestate
+        PlayScreen.drawStoryContent(story, bounds, previewMode)
+        return
+    end
+
+    -- PAGE mode: draw regular play screen
     local layout = Layout.getPlayLayout()
 
     -- Draw background
@@ -186,17 +240,114 @@ function PlayScreen.draw(gamestate, renderer)
     PlayScreen.drawLeftPanel(layout.leftPanel, layout.imageCard, page)
 
     -- Draw right panel (question + answers)
-    PlayScreen.drawRightPanel(layout.rightPanel, layout.buttons, page, gamestate)
+    PlayScreen.drawRightPanel(layout.rightPanel, layout.buttons, page, gamestate, previewMode)
 
-    -- Draw status bar
-    StatusBar.draw(
-        layout.statusBar.x,
-        layout.statusBar.y,
-        layout.statusBar.width,
-        layout.statusBar.height,
-        state.statusMessage,
-        state.statusType
-    )
+    -- Draw status bar (hide in preview mode)
+    if not previewMode then
+        StatusBar.draw(
+            layout.statusBar.x,
+            layout.statusBar.y,
+            layout.statusBar.width,
+            layout.statusBar.height,
+            state.statusMessage,
+            state.statusType
+        )
+    end
+
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Draw story content (cover image + title + topic) - used for STORY mode
+-- bounds: optional {x, y, width, height} for preview panel, nil = fullscreen
+function PlayScreen.drawStoryContent(story, bounds, previewMode)
+    local x, y, w, h
+    if bounds then
+        x, y, w, h = bounds.x, bounds.y, bounds.width, bounds.height
+    else
+        x, y, w, h = 0, 0, Tokens.VIRTUAL_WIDTH, Tokens.VIRTUAL_HEIGHT
+    end
+
+    -- Draw background
+    love.graphics.setColor(Tokens.COLORS.background)
+    love.graphics.rectangle("fill", x, y, w, h)
+
+    -- Draw decorative border (only for fullscreen)
+    if not bounds then
+        local borderSize = 8
+        love.graphics.setColor(0.3, 0.25, 0.4, 1)
+        love.graphics.rectangle("fill", x, y, w, borderSize)
+        love.graphics.rectangle("fill", x, y + h - borderSize, w, borderSize)
+        love.graphics.rectangle("fill", x, y, borderSize, h)
+        love.graphics.rectangle("fill", x + w - borderSize, y, borderSize, h)
+
+        local innerOffset = borderSize + 8
+        love.graphics.setColor(0.4, 0.35, 0.5, 0.8)
+        love.graphics.rectangle("line", x + innerOffset, y + innerOffset,
+            w - innerOffset * 2, h - innerOffset * 2)
+    end
+
+    -- Calculate image dimensions based on available space
+    local padding = bounds and 15 or 40
+    local imgW = math.min(300, w - padding * 2)
+    local imgH = math.min(200, h * 0.4)
+    local imgX = x + (w - imgW) / 2
+    local imgY = y + (bounds and 40 or 120)
+
+    -- Cover image
+    local coverImage = nil
+    if story.cover_image_path and story.cover_image_path ~= "" then
+        coverImage = ImageCard.loadImage(story.cover_image_path)
+    end
+
+    -- Draw image card background
+    love.graphics.setColor(0.15, 0.15, 0.2, 1)
+    love.graphics.rectangle("fill", imgX - 4, imgY - 4, imgW + 8, imgH + 8, 4)
+
+    if coverImage then
+        love.graphics.setColor(1, 1, 1, 1)
+        local scaleX = imgW / coverImage:getWidth()
+        local scaleY = imgH / coverImage:getHeight()
+        local scale = math.min(scaleX, scaleY)
+        local drawW = coverImage:getWidth() * scale
+        local drawH = coverImage:getHeight() * scale
+        local drawX = imgX + (imgW - drawW) / 2
+        local drawY = imgY + (imgH - drawH) / 2
+        love.graphics.draw(coverImage, drawX, drawY, 0, scale, scale)
+    else
+        -- Placeholder
+        love.graphics.setColor(0.2, 0.2, 0.25, 1)
+        love.graphics.rectangle("fill", imgX, imgY, imgW, imgH)
+        love.graphics.setColor(0.4, 0.4, 0.45, 1)
+        local font = love.graphics.getFont()
+        local placeholder = bounds and "[No Cover]" or "[Cover Image]"
+        local placeholderW = font:getWidth(placeholder)
+        love.graphics.print(placeholder, imgX + (imgW - placeholderW) / 2, imgY + imgH / 2 - 8)
+    end
+
+    -- Story title
+    local titleY = imgY + imgH + (bounds and 15 or 40)
+    love.graphics.setColor(1, 1, 1, 1)
+    local title = story.title or "Untitled Story"
+    local font = love.graphics.getFont()
+    local titleW = font:getWidth(title)
+    love.graphics.print(title, x + (w - titleW) / 2, titleY)
+
+    -- Topic/description
+    if story.topic and story.topic ~= "" then
+        local topicY = titleY + 25
+        love.graphics.setColor(0.7, 0.7, 0.8, 1)
+        local topicW = font:getWidth(story.topic)
+        love.graphics.print(story.topic, x + (w - topicW) / 2, topicY)
+    end
+
+    -- "Tap anywhere to start" prompt (only in fullscreen non-preview mode)
+    if not bounds and not previewMode then
+        local promptY = y + h - 80
+        love.graphics.setColor(0.6, 0.7, 0.9, 0.8)
+        local prompt = "~ Tap anywhere to start ~"
+        local promptW = font:getWidth(prompt)
+        love.graphics.print(prompt, x + (w - promptW) / 2, promptY)
+    end
 
     love.graphics.setColor(1, 1, 1, 1)
 end
@@ -222,7 +373,7 @@ function PlayScreen.drawLeftPanel(panel, imageCard, page)
 end
 
 -- Draw right panel with question and answers
-function PlayScreen.drawRightPanel(panel, btnLayout, page, gamestate)
+function PlayScreen.drawRightPanel(panel, btnLayout, page, gamestate, previewMode)
     -- Draw panel background
     Widgets.panel(panel.x, panel.y, panel.width, panel.height, {style = "elevated"})
 
@@ -233,7 +384,7 @@ function PlayScreen.drawRightPanel(panel, btnLayout, page, gamestate)
     end
 
     -- Draw question panel content
-    QuestionPanel.draw(panel, btnLayout, page, gamestate)
+    QuestionPanel.draw(panel, btnLayout, page, gamestate, previewMode)
 end
 
 -- Draw finished screen (win/lose)

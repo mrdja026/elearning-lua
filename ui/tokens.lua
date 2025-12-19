@@ -88,6 +88,29 @@ Tokens.COLORS = {
     input_bg = {0.18, 0.18, 0.23, 1.0},
     input_border = {0.40, 0.40, 0.45, 1.0},
     input_border_focus = {0.30, 0.65, 0.90, 1.0}, -- Primary color
+
+    -- Warm Storybook Theme
+    warm_cream = {0.96, 0.91, 0.82, 1.0},         -- Warm cream background
+    warm_brown = {0.55, 0.35, 0.20, 1.0},         -- Cozy brown (wood/trunk)
+    warm_orange = {0.95, 0.60, 0.30, 1.0},        -- Sunset orange accent
+    forest_green = {0.25, 0.50, 0.30, 1.0},       -- Tree/nature green
+    sky_blue_soft = {0.60, 0.80, 0.95, 1.0},      -- Soft sky blue
+
+    -- Decoration colors (pixel-art elements)
+    deco_tree_trunk = {0.45, 0.30, 0.18, 1.0},    -- Tree trunk brown
+    deco_tree_dark = {0.20, 0.40, 0.25, 1.0},     -- Dark foliage
+    deco_tree_light = {0.35, 0.55, 0.35, 1.0},    -- Light foliage
+    deco_star = {1.0, 0.95, 0.70, 1.0},           -- Warm star/sparkle
+    deco_circle = {0.85, 0.55, 0.35, 0.3},        -- Soft orange circle
+
+    -- Semi-transparent panel backgrounds (for Slab)
+    panel_dark_transparent = {0.12, 0.12, 0.16, 0.88},
+    panel_medium_transparent = {0.18, 0.18, 0.22, 0.90},
+    panel_light_transparent = {0.22, 0.22, 0.28, 0.85},
+
+    -- Dream It button
+    dream_button = {0.50, 0.35, 0.60, 1.0},       -- Purple magic
+    dream_button_hover = {0.60, 0.45, 0.70, 1.0},
 }
 
 -- Typography (sizes for different text roles)
@@ -156,8 +179,8 @@ Tokens.LAYOUT = {
         right_percent = 0.45,
         status_bar_height = 48,
         panel_padding = 24,
-        image_max_width = 656,
-        image_max_height = 420,
+        image_max_width = 2000,   -- Let panel size be the constraint
+        image_max_height = 2000,  -- Let panel size be the constraint
         image_border = 4,
         button_width = 220,
         button_height = 64,

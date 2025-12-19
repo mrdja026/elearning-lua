@@ -10,7 +10,8 @@
       "Bash(dir \"C:\\Users\\Mrdjan\\Documents\\workspace\\eai-learning\")",
       "Bash(npx tsc:*)",
       "Bash(findstr:*)",
-      "Bash(npx openspec:*)"
+      "Bash(npx openspec:*)",
+      "Bash(love . --test)"
     ]
   },
   "spinnerTipsEnabled": true

@@ -156,95 +156,123 @@ function Layout.getPlayLayout()
     }
 end
 
--- Get Config mode layout (3-column editor)
+-- Get Config mode layout (storybook-style: Thumbnails | Preview | Control Deck)
 -- Uses window dimensions directly since Create mode doesn't use virtual scaling
 function Layout.getConfigLayout()
     local L = Tokens.LAYOUT.config
     local w, h = love.graphics.getDimensions()
 
-    -- Top section heights
-    local fileHeight = 60
-    local storyHeight = 160  -- Increased for Topic + General Image Prompt fields
-    local topAreaHeight = fileHeight + storyHeight + 20  -- 10px margin + 10px gap
+    -- Fixed dimensions
+    local thumbnailsWidth = 160       -- Left sidebar for page thumbnails
+    local controlDeckWidth = 280      -- Right sidebar for control deck
+    local dreamItBarHeight = 70       -- Bottom bar for Dream It button
+    local margin = 10                 -- Margin between elements
 
-    -- Calculate main content area
-    local contentY = topAreaHeight
-    local statusH = 40
-    local contentHeight = h - topAreaHeight - statusH
+    -- Calculate positions with proper spacing
+    local thumbnailsX = margin
+    local previewX = thumbnailsX + thumbnailsWidth + margin
+    local controlDeckX = w - controlDeckWidth - margin
+    local previewWidth = controlDeckX - previewX - margin
+    local previewHeight = h - dreamItBarHeight - margin * 2
 
-    -- Panel widths - responsive to window size
-    local pagesWidth = math.min(200, math.floor(w * 0.15))
-    local previewWidth = math.min(420, math.floor(w * 0.35))
-    local editorWidth = w - pagesWidth - previewWidth - 30  -- 30px for margins
+    -- Story settings header (collapsible, at top of control deck)
+    local storySettingsCollapsedHeight = 50
+    local storySettingsExpandedHeight = 200
 
-    -- Calculate panel positions
-    local pagesX = 10
-    local editorX = pagesX + pagesWidth + 10
-    local previewX = editorX + editorWidth + 10
+    -- Minimum window width check: if too narrow, reduce sidebar widths
+    local minPreviewWidth = 200
+    if previewWidth < minPreviewWidth then
+        -- Window is too narrow, proportionally reduce sidebar widths
+        local availableForSidebars = w - minPreviewWidth - margin * 4
+        thumbnailsWidth = math.floor(availableForSidebars * 0.35)
+        controlDeckWidth = math.floor(availableForSidebars * 0.65)
+
+        -- Recalculate positions
+        thumbnailsX = margin
+        previewX = thumbnailsX + thumbnailsWidth + margin
+        controlDeckX = w - controlDeckWidth - margin
+        previewWidth = controlDeckX - previewX - margin
+    end
 
     return {
-        -- File panel (top row)
-        filePanel = {
-            x = 10,
-            y = 10,
-            width = editorWidth + pagesWidth,
-            height = fileHeight,
+        -- Page thumbnails panel (left sidebar)
+        thumbnailsPanel = {
+            x = thumbnailsX,
+            y = margin,
+            width = thumbnailsWidth,
+            height = h - dreamItBarHeight - margin * 2,
+            padding = Tokens.SPACING.xs,
+            thumbnailWidth = 120,
+            thumbnailHeight = 80,
+            thumbnailGap = 8,
         },
 
-        -- Story panel (below file panel)
-        storyPanel = {
-            x = 10,
-            y = 10 + fileHeight + 10,
-            width = editorWidth + pagesWidth,
-            height = storyHeight,
-        },
-
-        -- Pages panel (left sidebar)
-        pagesPanel = {
-            x = pagesX,
-            y = contentY,
-            width = pagesWidth,
-            height = contentHeight,
-            padding = Tokens.SPACING.xs + 4,
-            contentX = pagesX + Tokens.SPACING.xs + 4,
-            contentY = contentY + Tokens.SPACING.xs + 4,
-            contentWidth = pagesWidth - (Tokens.SPACING.xs + 4) * 2,
-            contentHeight = contentHeight - (Tokens.SPACING.xs + 4) * 2,
-        },
-
-        -- Editor panel (center)
-        editorPanel = {
-            x = editorX,
-            y = contentY,
-            width = editorWidth,
-            height = contentHeight,
-            padding = L.panel_padding,
-            contentX = editorX + L.panel_padding,
-            contentY = contentY + L.panel_padding,
-            contentWidth = editorWidth - L.panel_padding * 2,
-            contentHeight = contentHeight - L.panel_padding * 2,
-        },
-
-        -- Preview panel (right)
+        -- Preview panel (center - BIG!)
         previewPanel = {
             x = previewX,
-            y = contentY,
+            y = margin,
             width = previewWidth,
-            height = contentHeight,
+            height = previewHeight,
             padding = L.panel_padding,
-            scale = L.preview_scale,
-            contentX = previewX + L.panel_padding,
-            contentY = contentY + L.panel_padding,
-            contentWidth = previewWidth - L.panel_padding * 2,
-            contentHeight = contentHeight - L.panel_padding * 2,
+            -- Calculate scale to fit 800x600 in available space
+            scale = math.min(
+                (previewWidth - L.panel_padding * 2 - 20) / 800,
+                (previewHeight - L.panel_padding * 2 - 50) / 600
+            ) * 0.90,
         },
 
-        -- Status bar (bottom)
+        -- Story settings header (collapsible, top of right sidebar)
+        storySettingsHeader = {
+            x = controlDeckX,
+            y = margin,
+            width = controlDeckWidth,
+            height = storySettingsCollapsedHeight,
+            expandedHeight = storySettingsExpandedHeight,
+            collapsedHeight = storySettingsCollapsedHeight,
+        },
+
+        -- Control deck panel (right sidebar)
+        controlDeckPanel = {
+            x = controlDeckX,
+            y = margin + storySettingsCollapsedHeight + 5,
+            width = controlDeckWidth,
+            height = h - dreamItBarHeight - storySettingsCollapsedHeight - margin * 2 - 5,
+            padding = L.panel_padding,
+        },
+
+        -- Dream It button bar (bottom)
+        dreamItBar = {
+            x = margin,
+            y = h - dreamItBarHeight - margin,
+            width = w - margin * 2,
+            height = dreamItBarHeight,
+            buttonWidth = 250,
+            buttonHeight = 50,
+        },
+
+        -- Legacy compatibility (kept for any remaining references)
+        pagesPanel = {
+            x = thumbnailsX,
+            y = margin,
+            width = thumbnailsWidth,
+            height = h - dreamItBarHeight - margin * 2,
+            padding = Tokens.SPACING.xs,
+        },
+
+        editorPanel = {
+            x = controlDeckX,
+            y = margin + storySettingsCollapsedHeight + 5,
+            width = controlDeckWidth,
+            height = h - dreamItBarHeight - storySettingsCollapsedHeight - margin * 2 - 5,
+            padding = L.panel_padding,
+        },
+
+        -- Status bar (now toast-style, positioned dynamically)
         statusBar = {
-            x = 0,
-            y = h - statusH,
-            width = w,
-            height = statusH,
+            x = margin,
+            y = h - dreamItBarHeight - margin - 40,
+            width = 400,
+            height = 35,
             padding = Tokens.SPACING.sm,
         },
     }
