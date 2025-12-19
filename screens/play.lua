@@ -9,6 +9,7 @@ local InputManager = require("ui.input_manager")
 local ImageCard = require("components.image_card")
 local QuestionPanel = require("components.question_panel")
 local StatusBar = require("components.status_bar")
+local schema = require("schema")
 
 local PlayScreen = {}
 
@@ -18,6 +19,7 @@ local state = {
     statusMessage = "",
     statusType = "info",
     statusTimer = 0,
+    showingStoryFrame = false,  -- Story Frame intro screen state
 }
 
 -- Initialize play screen
@@ -34,8 +36,15 @@ function PlayScreen.enter(gamestate)
     state.statusMessage = ""
     state.statusType = "info"
 
-    -- Register answer buttons as focusable
-    PlayScreen.registerFocusables(gamestate)
+    -- Check if story has a Story Frame (cover image)
+    local story = gamestate.getStory and gamestate.getStory() or nil
+    if story and schema.hasStoryFrame(story) then
+        state.showingStoryFrame = true
+    else
+        state.showingStoryFrame = false
+        -- Register answer buttons as focusable only if not showing Story Frame
+        PlayScreen.registerFocusables(gamestate)
+    end
 end
 
 -- Exit play screen
@@ -149,6 +158,103 @@ function PlayScreen.setCallbacks(callbacks)
     PlayScreen.submitCallback = callbacks.onSubmit
 end
 
+-- Check if currently showing Story Frame
+function PlayScreen.isShowingStoryFrame()
+    return state.showingStoryFrame
+end
+
+-- Dismiss Story Frame and proceed to Page 1
+function PlayScreen.dismissStoryFrame(gamestate)
+    if state.showingStoryFrame then
+        state.showingStoryFrame = false
+        -- Register focusables now that we're entering actual gameplay
+        PlayScreen.registerFocusables(gamestate)
+    end
+end
+
+-- Draw Story Frame intro screen
+function PlayScreen.drawStoryFrame(story)
+    -- Draw background
+    love.graphics.setColor(Tokens.COLORS.background)
+    love.graphics.rectangle("fill", 0, 0, Tokens.VIRTUAL_WIDTH, Tokens.VIRTUAL_HEIGHT)
+
+    -- Draw pixel art decorations (border frame)
+    local borderSize = 8
+    love.graphics.setColor(0.3, 0.25, 0.4, 1)  -- Purple-ish border
+    love.graphics.rectangle("fill", 0, 0, Tokens.VIRTUAL_WIDTH, borderSize)
+    love.graphics.rectangle("fill", 0, Tokens.VIRTUAL_HEIGHT - borderSize, Tokens.VIRTUAL_WIDTH, borderSize)
+    love.graphics.rectangle("fill", 0, 0, borderSize, Tokens.VIRTUAL_HEIGHT)
+    love.graphics.rectangle("fill", Tokens.VIRTUAL_WIDTH - borderSize, 0, borderSize, Tokens.VIRTUAL_HEIGHT)
+
+    -- Inner decorative frame
+    local innerBorder = 4
+    local innerOffset = borderSize + 8
+    love.graphics.setColor(0.4, 0.35, 0.5, 0.8)
+    love.graphics.rectangle("line", innerOffset, innerOffset,
+        Tokens.VIRTUAL_WIDTH - innerOffset * 2,
+        Tokens.VIRTUAL_HEIGHT - innerOffset * 2)
+
+    -- Cover image (centered, prominent)
+    local coverImage = nil
+    if story.cover_image_path and story.cover_image_path ~= "" then
+        coverImage = ImageCard.loadImage(story.cover_image_path)
+    end
+
+    local imgW, imgH = 300, 200
+    local imgX = (Tokens.VIRTUAL_WIDTH - imgW) / 2
+    local imgY = 120
+
+    -- Draw image card background
+    love.graphics.setColor(0.15, 0.15, 0.2, 1)
+    love.graphics.rectangle("fill", imgX - 4, imgY - 4, imgW + 8, imgH + 8, 4)
+
+    if coverImage then
+        love.graphics.setColor(1, 1, 1, 1)
+        local scaleX = imgW / coverImage:getWidth()
+        local scaleY = imgH / coverImage:getHeight()
+        local scale = math.min(scaleX, scaleY)
+        local drawW = coverImage:getWidth() * scale
+        local drawH = coverImage:getHeight() * scale
+        local drawX = imgX + (imgW - drawW) / 2
+        local drawY = imgY + (imgH - drawH) / 2
+        love.graphics.draw(coverImage, drawX, drawY, 0, scale, scale)
+    else
+        -- Placeholder
+        love.graphics.setColor(0.2, 0.2, 0.25, 1)
+        love.graphics.rectangle("fill", imgX, imgY, imgW, imgH)
+        love.graphics.setColor(0.4, 0.4, 0.45, 1)
+        local placeholder = "[Cover Image]"
+        local font = love.graphics.getFont()
+        local placeholderW = font:getWidth(placeholder)
+        love.graphics.print(placeholder, imgX + (imgW - placeholderW) / 2, imgY + imgH / 2 - 8)
+    end
+
+    -- Story title
+    local titleY = imgY + imgH + 40
+    love.graphics.setColor(1, 1, 1, 1)
+    local title = story.title or "Untitled Story"
+    local font = love.graphics.getFont()
+    local titleW = font:getWidth(title)
+    love.graphics.print(title, (Tokens.VIRTUAL_WIDTH - titleW) / 2, titleY)
+
+    -- Topic/description
+    if story.topic and story.topic ~= "" then
+        local topicY = titleY + 30
+        love.graphics.setColor(0.7, 0.7, 0.8, 1)
+        local topicW = font:getWidth(story.topic)
+        love.graphics.print(story.topic, (Tokens.VIRTUAL_WIDTH - topicW) / 2, topicY)
+    end
+
+    -- "Tap anywhere to start" prompt (pulsing effect would be nice but keeping it simple)
+    local promptY = Tokens.VIRTUAL_HEIGHT - 80
+    love.graphics.setColor(0.6, 0.7, 0.9, 0.8)
+    local prompt = "~ Tap anywhere to start ~"
+    local promptW = font:getWidth(prompt)
+    love.graphics.print(prompt, (Tokens.VIRTUAL_WIDTH - promptW) / 2, promptY)
+
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
 -- Show status message
 function PlayScreen.showStatus(message, msgType, duration)
     state.statusMessage = message or ""
@@ -172,7 +278,8 @@ function PlayScreen.update(dt, gamestate)
 end
 
 -- Draw play screen
-function PlayScreen.draw(gamestate, renderer)
+-- previewMode: if true, buttons are disabled (gray) for config mode preview
+function PlayScreen.draw(gamestate, renderer, previewMode)
     local layout = Layout.getPlayLayout()
 
     -- Draw background
@@ -186,17 +293,19 @@ function PlayScreen.draw(gamestate, renderer)
     PlayScreen.drawLeftPanel(layout.leftPanel, layout.imageCard, page)
 
     -- Draw right panel (question + answers)
-    PlayScreen.drawRightPanel(layout.rightPanel, layout.buttons, page, gamestate)
+    PlayScreen.drawRightPanel(layout.rightPanel, layout.buttons, page, gamestate, previewMode)
 
-    -- Draw status bar
-    StatusBar.draw(
-        layout.statusBar.x,
-        layout.statusBar.y,
-        layout.statusBar.width,
-        layout.statusBar.height,
-        state.statusMessage,
-        state.statusType
-    )
+    -- Draw status bar (hide in preview mode)
+    if not previewMode then
+        StatusBar.draw(
+            layout.statusBar.x,
+            layout.statusBar.y,
+            layout.statusBar.width,
+            layout.statusBar.height,
+            state.statusMessage,
+            state.statusType
+        )
+    end
 
     love.graphics.setColor(1, 1, 1, 1)
 end
@@ -222,7 +331,7 @@ function PlayScreen.drawLeftPanel(panel, imageCard, page)
 end
 
 -- Draw right panel with question and answers
-function PlayScreen.drawRightPanel(panel, btnLayout, page, gamestate)
+function PlayScreen.drawRightPanel(panel, btnLayout, page, gamestate, previewMode)
     -- Draw panel background
     Widgets.panel(panel.x, panel.y, panel.width, panel.height, {style = "elevated"})
 
@@ -233,7 +342,7 @@ function PlayScreen.drawRightPanel(panel, btnLayout, page, gamestate)
     end
 
     -- Draw question panel content
-    QuestionPanel.draw(panel, btnLayout, page, gamestate)
+    QuestionPanel.draw(panel, btnLayout, page, gamestate, previewMode)
 end
 
 -- Draw finished screen (win/lose)

@@ -17,12 +17,27 @@ local Decorations = require("ui.decorations")
 local APP_MODE = "create"
 local errorMessage = nil
 
--- Legacy preview constants removed - now using Layout.getConfigLayout()
+-- Preview canvas for config mode (renders PlayScreen at virtual resolution)
+local previewCanvas = nil
+
+-- Mock gamestate for preview mode (wraps editor's current page)
+local previewGamestate = {
+    getCurrentPage = function()
+        return editor.getCurrentPage()
+    end,
+    getTextInput = function() return "" end,
+    getMultiAnswer = function() return "" end,
+    getActiveInput = function() return 1 end,
+    getErrors = function() return {} end,
+}
 
 function love.load()
     -- Set default font
     love.graphics.setNewFont(Tokens.TYPOGRAPHY.body.size)
     love.keyboard.setKeyRepeat(true)
+
+    -- Create preview canvas at virtual resolution
+    previewCanvas = love.graphics.newCanvas(Tokens.VIRTUAL_WIDTH, Tokens.VIRTUAL_HEIGHT)
 
     -- Initialize UI systems
     Layout.init()
@@ -125,7 +140,7 @@ function drawCreateMode()
     drawCenterPreview()
 end
 
--- Center preview panel - the main visual focus of the storybook layout
+-- Center preview panel - renders PlayScreen to canvas with disabled buttons
 function drawCenterPreview()
     local layout = Layout.getConfigLayout()
     local panel = layout.previewPanel
@@ -134,7 +149,6 @@ function drawCenterPreview()
     local previewY = panel.y
     local previewW = panel.width
     local previewH = panel.height
-    local previewScale = panel.scale or 0.6
 
     -- Draw semi-transparent panel background
     love.graphics.setColor(Tokens.COLORS.panel_dark_transparent)
@@ -146,7 +160,7 @@ function drawCenterPreview()
 
     -- Preview label
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print("Preview", previewX + 15, previewY + 7)
+    love.graphics.print("Preview (Play Mode)", previewX + 15, previewY + 7)
 
     -- Draw subtle border
     love.graphics.setColor(0.35, 0.35, 0.40, 0.8)
@@ -154,147 +168,42 @@ function drawCenterPreview()
     love.graphics.rectangle("line", previewX, previewY, previewW, previewH, 8)
     love.graphics.setLineWidth(1)
 
-    -- Calculate centering for the preview content
+    -- Render PlayScreen to canvas in preview mode
+    love.graphics.setCanvas(previewCanvas)
+    love.graphics.clear(0, 0, 0, 1)
+
+    local page = editor.getCurrentPage()
+    if page then
+        -- Draw PlayScreen with previewMode = true (buttons disabled)
+        PlayScreen.draw(previewGamestate, nil, true)
+    else
+        love.graphics.setColor(Tokens.COLORS.background)
+        love.graphics.rectangle("fill", 0, 0, Tokens.VIRTUAL_WIDTH, Tokens.VIRTUAL_HEIGHT)
+        love.graphics.setColor(0.5, 0.5, 0.5)
+        love.graphics.print("No page selected", 350, 280)
+    end
+
+    love.graphics.setCanvas()
+
+    -- Calculate scale and position to fit canvas in preview area
     local contentX = previewX + panel.padding
     local contentY = previewY + 40
     local contentW = previewW - panel.padding * 2
     local contentH = previewH - 50
 
-    -- Center the scaled preview within the content area
-    local scaledW = 800 * previewScale
-    local scaledH = 600 * previewScale
+    -- Calculate scale to fit 800x600 canvas
+    local scaleX = contentW / Tokens.VIRTUAL_WIDTH
+    local scaleY = contentH / Tokens.VIRTUAL_HEIGHT
+    local scale = math.min(scaleX, scaleY) * 0.95  -- 95% to leave margin
+
+    local scaledW = Tokens.VIRTUAL_WIDTH * scale
+    local scaledH = Tokens.VIRTUAL_HEIGHT * scale
     local offsetX = (contentW - scaledW) / 2
     local offsetY = (contentH - scaledH) / 2
 
-    love.graphics.push()
-    love.graphics.translate(contentX + offsetX, contentY + offsetY)
-    love.graphics.scale(previewScale, previewScale)
-
-    local page = editor.getCurrentPage()
-    if page then
-        drawPreviewPage(page)
-    else
-        love.graphics.setColor(0.5, 0.5, 0.5)
-        love.graphics.print("No page selected", 300, 280)
-    end
-
-    love.graphics.pop()
+    -- Draw the canvas
     love.graphics.setColor(1, 1, 1, 1)
-end
-
--- Legacy function name for compatibility
-function drawPreviewPanel()
-    drawCenterPreview()
-end
-
-function drawPreviewPage(page)
-    love.graphics.setColor(0.2, 0.2, 0.3)
-    love.graphics.rectangle("fill", 0, 0, 800, 600)
-
-    love.graphics.setColor(0.4, 0.4, 0.5)
-    love.graphics.rectangle("fill", 100, 50, 600, 300, 10)
-
-    if page.image_path and page.image_path ~= "" then
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.print("[" .. page.image_path .. "]", 300, 190)
-    else
-        love.graphics.setColor(0.6, 0.6, 0.6)
-        love.graphics.print("[Image Placeholder]", 320, 190)
-    end
-
-    love.graphics.setColor(1, 1, 1)
-    local questionText = page.question_text or ""
-    local font = love.graphics.getFont()
-    local textW = font:getWidth(questionText)
-    love.graphics.print(questionText, (800 - textW) / 2, 380)
-
-    if page.hint_text and page.hint_text ~= "" then
-        love.graphics.setColor(0.7, 0.7, 0.7)
-        local hintW = font:getWidth(page.hint_text)
-        love.graphics.print(page.hint_text, (800 - hintW) / 2, 420)
-    end
-
-    local questionType = page.question_type or "yesno"
-
-    if questionType == "yesno" then
-        local labels = page.choice_labels or {"Yes", "No"}
-        local btnW, btnH = 200, 60
-        local spacing = 50
-        local totalW = btnW * 2 + spacing
-        local startX = (800 - totalW) / 2
-
-        for i, label in ipairs(labels) do
-            local x = startX + (i - 1) * (btnW + spacing)
-            local y = 480
-
-            love.graphics.setColor(0.3, 0.5, 0.7)
-            love.graphics.rectangle("fill", x, y, btnW, btnH, 8)
-
-            love.graphics.setColor(1, 1, 1)
-            local labelW = font:getWidth(label)
-            love.graphics.print(label, x + (btnW - labelW) / 2, y + 20)
-        end
-
-        -- Show correct answer indicator
-        local correctText = page.correct_answer_is_yes and "Correct: Yes" or "Correct: No"
-        love.graphics.setColor(0.5, 0.7, 0.5)
-        love.graphics.print(correctText, 20, 560)
-
-    elseif questionType == "text" then
-        local inputX = (800 - 400) / 2
-        local inputY = 450
-
-        love.graphics.setColor(0.15, 0.15, 0.2)
-        love.graphics.rectangle("fill", inputX, inputY, 400, 40, 5)
-        love.graphics.setColor(0.4, 0.4, 0.5)
-        love.graphics.rectangle("line", inputX, inputY, 400, 40, 5)
-
-        love.graphics.setColor(0.6, 0.6, 0.6)
-        love.graphics.print("[Text Input]", inputX + 150, inputY + 10)
-
-        local btnX = (800 - 200) / 2
-        love.graphics.setColor(0.3, 0.5, 0.7)
-        love.graphics.rectangle("fill", btnX, 510, 200, 50, 8)
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.print("Submit", btnX + 75, 525)
-
-        love.graphics.setColor(0.5, 0.7, 0.5)
-        love.graphics.print("Answer: " .. (page.correct_answer or "?"), 20, 560)
-
-    elseif questionType == "multi" then
-        local questions = page.questions or {}
-        local startY = 420
-
-        for i, q in ipairs(questions) do
-            local y = startY + (i - 1) * 50
-            love.graphics.setColor(0.8, 0.8, 0.8)
-            love.graphics.print(i .. ". " .. (q.question_text or ""), 200, y)
-
-            love.graphics.setColor(0.15, 0.15, 0.2)
-            love.graphics.rectangle("fill", 200, y + 18, 300, 25, 3)
-            love.graphics.setColor(0.4, 0.4, 0.5)
-            love.graphics.rectangle("line", 200, y + 18, 300, 25, 3)
-        end
-
-        if #questions > 0 then
-            local btnY = startY + #questions * 50 + 10
-            local btnX = (800 - 200) / 2
-            love.graphics.setColor(0.3, 0.5, 0.7)
-            love.graphics.rectangle("fill", btnX, btnY, 200, 40, 8)
-            love.graphics.setColor(1, 1, 1)
-            love.graphics.print("Submit All", btnX + 60, btnY + 10)
-        end
-
-        love.graphics.setColor(0.5, 0.7, 0.5)
-        love.graphics.print("Questions: " .. #questions, 20, 560)
-    end
-
-    -- Show linear navigation info
-    love.graphics.setColor(0.7, 0.7, 0.5)
-    love.graphics.print("Navigation: Linear (correct=next, wrong=retry)", 450, 560)
-
-    love.graphics.setColor(0.6, 0.8, 0.6)
-    love.graphics.print("Type: " .. questionType, 20, 540)
+    love.graphics.draw(previewCanvas, contentX + offsetX, contentY + offsetY, 0, scale, scale)
 end
 
 function drawPlayMode()
@@ -303,6 +212,16 @@ function drawPlayMode()
 
     if errorMessage then
         PlayScreen.drawError(errorMessage)
+        Layout.resetTransform()
+        return
+    end
+
+    -- Check if showing Story Frame (intro screen)
+    if PlayScreen.isShowingStoryFrame() then
+        local story = gamestate.getStory()
+        if story then
+            PlayScreen.drawStoryFrame(story)
+        end
         Layout.resetTransform()
         return
     end
@@ -348,6 +267,13 @@ function love.mousepressed(x, y, button)
         -- Slab handles the rest via its own input system
     elseif APP_MODE == "play" then
         if errorMessage then return end
+
+        -- Handle Story Frame dismissal (tap anywhere to start)
+        if PlayScreen.isShowingStoryFrame() then
+            PlayScreen.dismissStoryFrame(gamestate)
+            return
+        end
+
         if gamestate.isFinished() then return end
 
         local page = gamestate.getCurrentPage()
@@ -402,6 +328,12 @@ function love.keypressed(key)
     if APP_MODE == "create" then
         editor.keypressed(key)
     else
+        -- Handle Story Frame dismissal (any key except tab)
+        if PlayScreen.isShowingStoryFrame() then
+            PlayScreen.dismissStoryFrame(gamestate)
+            return
+        end
+
         if key == "r" then
             restartGame()
         elseif key == "escape" then

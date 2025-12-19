@@ -41,10 +41,12 @@ function editor.newStory()
         title = "New Story",
         topic = "",
         general_image_prompt = "",
+        cover_image_path = "",  -- Story Frame cover image
         pages = {
             {
                 id = 1,
                 image_path = "",
+                image_prompt = "",  -- Per-page prompt (overrides story prompt)
                 question_text = "Enter your question here",
                 hint_text = "",
                 choice_labels = {"Yes", "No"},
@@ -59,6 +61,7 @@ function editor.newStory()
     state.isDirty = false
     state.isGenerating = false
     state.generationError = nil
+    state.storySettingsExpanded = true  -- Expanded by default for new stories
     editor.showMessage("New story created")
 end
 
@@ -446,8 +449,19 @@ function editor.drawPageThumbnails()
     local layout = Layout.getConfigLayout()
     local panel = layout.thumbnailsPanel
 
+    -- Check if Pages panel should be gated (no cover for new stories)
+    state.story.cover_image_path = state.story.cover_image_path or ""
+    local hasCover = state.story.cover_image_path ~= ""
+    -- Legacy stories (loaded from file) should not be gated
+    local isLegacyStory = state.story._isLegacy == true
+    local pagesEnabled = hasCover or isLegacyStory
+
     -- Draw panel background
-    love.graphics.setColor(Tokens.COLORS.panel_dark_transparent)
+    if pagesEnabled then
+        love.graphics.setColor(Tokens.COLORS.panel_dark_transparent)
+    else
+        love.graphics.setColor(0.15, 0.15, 0.18, 0.8)  -- Darker/grayed out
+    end
     love.graphics.rectangle("fill", panel.x, panel.y, panel.width, panel.height, 6)
 
     -- Draw header
@@ -456,22 +470,73 @@ function editor.drawPageThumbnails()
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("Pages", panel.x + 10, panel.y + 7)
 
+    -- If pages are gated, show message and return early
+    if not pagesEnabled then
+        love.graphics.setColor(0.7, 0.7, 0.5, 1)
+        local msg1 = "Generate cover"
+        local msg2 = "first"
+        local font = love.graphics.getFont()
+        local msg1W = font:getWidth(msg1)
+        local msg2W = font:getWidth(msg2)
+        local centerX = panel.x + panel.width / 2
+        local centerY = panel.y + panel.height / 2 - 20
+        love.graphics.print(msg1, centerX - msg1W / 2, centerY)
+        love.graphics.print(msg2, centerX - msg2W / 2, centerY + 20)
+        love.graphics.setColor(1, 1, 1, 1)
+        return
+    end
+
     -- Thumbnail dimensions
     local thumbW = panel.width - 20
     local thumbH = 60
     local thumbGap = 8
     local startY = panel.y + 40
+    local thumbX = panel.x + 10
+    local font = love.graphics.getFont()
+    local thumbIndex = 0  -- Track visual position
 
-    -- Draw page thumbnails
+    -- Draw Page-Story thumbnail FIRST if cover exists
+    if hasCover then
+        local thumbY = startY + thumbIndex * (thumbH + thumbGap)
+        local isSelected = (state.selectedPageIndex == 0)
+
+        -- Page-Story has special purple/gold styling
+        if isSelected then
+            love.graphics.setColor(0.4, 0.3, 0.5, 1)  -- Purple selected
+        else
+            love.graphics.setColor(0.3, 0.25, 0.35, 1)  -- Purple unselected
+        end
+        love.graphics.rectangle("fill", thumbX, thumbY, thumbW, thumbH, 4)
+
+        -- Border
+        if isSelected then
+            love.graphics.setColor(0.7, 0.5, 0.9, 1)  -- Bright purple
+        else
+            love.graphics.setColor(0.5, 0.4, 0.55, 1)
+        end
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", thumbX, thumbY, thumbW, thumbH, 4)
+        love.graphics.setLineWidth(1)
+
+        -- Label with lock indicator
+        love.graphics.setColor(0.9, 0.8, 0.5, 1)  -- Gold text
+        local label = "Page-Story"
+        local labelW = font:getWidth(label)
+        love.graphics.print(label, thumbX + (thumbW - labelW) / 2, thumbY + (thumbH - 16) / 2)
+
+        thumbIndex = thumbIndex + 1
+    end
+
+    -- Draw regular page thumbnails
     for i, page in ipairs(state.story.pages) do
-        local thumbX = panel.x + 10
-        local thumbY = startY + (i - 1) * (thumbH + thumbGap)
+        local thumbY = startY + thumbIndex * (thumbH + thumbGap)
 
         -- Check if thumbnail is visible in panel
         if thumbY + thumbH > panel.y + panel.height - 60 then
             break -- Stop drawing if we run out of space
         end
 
+        -- selectedPageIndex: 0 = Page-Story, >= 1 = regular pages (1-indexed)
         local isSelected = (i == state.selectedPageIndex)
 
         -- Thumbnail background
@@ -495,9 +560,10 @@ function editor.drawPageThumbnails()
         -- Page label centered
         love.graphics.setColor(1, 1, 1, 1)
         local label = "Page " .. page.id
-        local font = love.graphics.getFont()
         local labelW = font:getWidth(label)
         love.graphics.print(label, thumbX + (thumbW - labelW) / 2, thumbY + (thumbH - 16) / 2)
+
+        thumbIndex = thumbIndex + 1
     end
 
     -- Bottom buttons area
@@ -546,15 +612,39 @@ function editor.handleThumbnailClick(x, y)
     if x < panel.x or x > panel.x + panel.width then return false end
     if y < panel.y or y > panel.y + panel.height then return false end
 
+    -- Check if Pages panel is gated
+    state.story.cover_image_path = state.story.cover_image_path or ""
+    local hasCover = state.story.cover_image_path ~= ""
+    local isLegacyStory = state.story._isLegacy == true
+    local pagesEnabled = hasCover or isLegacyStory
+
+    if not pagesEnabled then
+        editor.showMessage("Generate cover first!")
+        return true  -- Consume click but don't do anything
+    end
+
     -- Check thumbnail clicks
     local thumbW = panel.width - 20
     local thumbH = 60
     local thumbGap = 8
     local startY = panel.y + 40
+    local thumbX = panel.x + 10
+    local thumbIndex = 0
 
+    -- Check Page-Story click first (if cover exists)
+    if hasCover then
+        local thumbY = startY + thumbIndex * (thumbH + thumbGap)
+        if x >= thumbX and x <= thumbX + thumbW and
+           y >= thumbY and y <= thumbY + thumbH then
+            state.selectedPageIndex = 0  -- Page-Story
+            return true
+        end
+        thumbIndex = thumbIndex + 1
+    end
+
+    -- Check regular page clicks
     for i, page in ipairs(state.story.pages) do
-        local thumbX = panel.x + 10
-        local thumbY = startY + (i - 1) * (thumbH + thumbGap)
+        local thumbY = startY + thumbIndex * (thumbH + thumbGap)
 
         if thumbY + thumbH > panel.y + panel.height - 60 then
             break
@@ -562,9 +652,10 @@ function editor.handleThumbnailClick(x, y)
 
         if x >= thumbX and x <= thumbX + thumbW and
            y >= thumbY and y <= thumbY + thumbH then
-            state.selectedPageIndex = i
+            state.selectedPageIndex = i  -- Regular page (1-indexed)
             return true
         end
+        thumbIndex = thumbIndex + 1
     end
 
     -- Check button clicks
@@ -660,6 +751,46 @@ function editor.drawStorySettingsHeader()
         if Slab.Input("GeneralImagePromptNew", {Text = state.story.general_image_prompt, W = inputW, MultiLine = true, H = 45}) then
             state.story.general_image_prompt = Slab.GetInputText()
         end
+
+        Slab.Separator()
+
+        -- Cover image status and Generate Cover button
+        state.story.cover_image_path = state.story.cover_image_path or ""
+        local hasCover = state.story.cover_image_path ~= ""
+        local hasPrompt = state.story.general_image_prompt and state.story.general_image_prompt ~= ""
+
+        if hasCover then
+            Slab.Text("Cover: Generated", {Color = {0.5, 0.8, 0.5, 1}})
+        else
+            Slab.Text("Cover: Not generated", {Color = {0.8, 0.5, 0.5, 1}})
+        end
+
+        -- Generate Cover button
+        if state.isGenerating then
+            Slab.Text("Generating cover...", {Color = {0.8, 0.8, 0.3, 1}})
+        else
+            if Slab.Button("Generate Cover", {W = inputW, Disabled = not hasPrompt}) then
+                -- DEV_MODE: Use existing test image as placeholder
+                local mockImage = "pics/Gemini_Generated_Image_rod070rod070rod0.png"
+
+                -- 1. Set cover image (FIXED - won't change)
+                state.story.cover_image_path = mockImage
+
+                -- 2. Clear only the prompt (title/topic stay saved!)
+                state.story.general_image_prompt = ""
+
+                -- 3. Collapse Story Settings
+                state.storySettingsExpanded = false
+
+                -- 4. Select Page-Story (index 0)
+                state.selectedPageIndex = 0
+
+                editor.showMessage("Cover generated! Page-Story created.")
+            end
+            if not hasPrompt then
+                Slab.Text("Enter Image Prompt first", {Color = {0.6, 0.6, 0.6, 1}})
+            end
+        end
     end
 
     Slab.EndWindow()
@@ -689,6 +820,37 @@ function editor.drawControlDeck()
     })
 
     local inputW = panel.width - 30
+
+    -- Check if Page-Story is selected (index 0)
+    if state.selectedPageIndex == 0 then
+        -- Show Page-Story preview (read-only)
+        Slab.Text("Page-Story Preview", {Color = {0.9, 0.8, 0.5, 1}})
+        Slab.Separator()
+
+        Slab.Text("Title:")
+        Slab.Text(state.story.title or "(no title)", {Color = {0.7, 0.7, 0.8, 1}})
+
+        Slab.Text("Topic:")
+        Slab.Text(state.story.topic or "(no topic)", {Color = {0.7, 0.7, 0.8, 1}})
+
+        Slab.Separator()
+        Slab.Text("Cover Image:")
+        local coverPath = state.story.cover_image_path or ""
+        if coverPath ~= "" then
+            Slab.Text(coverPath, {Color = {0.6, 0.8, 0.6, 1}})
+        else
+            Slab.Text("(no cover)", {Color = {0.5, 0.5, 0.5, 1}})
+        end
+
+        Slab.Separator()
+        Slab.Text("This page cannot be edited.", {Color = {0.6, 0.6, 0.6, 1}})
+        Slab.Text("It shows in Play mode as the", {Color = {0.6, 0.6, 0.6, 1}})
+        Slab.Text("intro screen before Page 1.", {Color = {0.6, 0.6, 0.6, 1}})
+
+        Slab.EndWindow()
+        return
+    end
+
     local page = state.story.pages[state.selectedPageIndex]
 
     if not page then
@@ -722,41 +884,30 @@ function editor.drawControlDeck()
         Slab.Text("(no image)", {Color = {0.5, 0.5, 0.5, 1}})
     end
 
-    -- Page-specific image prompt (optional, overrides story prompt)
+    -- Page image prompt (required for page image generation)
     page.image_prompt = page.image_prompt or ""
-    Slab.Text("Image Prompt (optional)")
+    Slab.Text("Image Prompt")
     if Slab.Input("PageImagePrompt", {Text = page.image_prompt, W = inputW, H = 40, MultiLine = true}) then
         page.image_prompt = Slab.GetInputText()
     end
 
-    -- Show which prompt will be used
+    -- Check if page has a prompt
     local hasPagePrompt = page.image_prompt and page.image_prompt ~= ""
-    local hasStoryPrompt = state.story.general_image_prompt and state.story.general_image_prompt ~= ""
 
     if hasPagePrompt then
-        Slab.Text("Using: Page prompt", {Color = {0.5, 0.7, 0.9, 1}})
-    elseif hasStoryPrompt then
-        Slab.Text("Using: Story prompt", {Color = {0.7, 0.7, 0.5, 1}})
+        Slab.Text("Ready to generate", {Color = {0.5, 0.8, 0.5, 1}})
     else
-        Slab.Text("No prompt set!", {Color = {0.8, 0.4, 0.4, 1}})
+        Slab.Text("Enter prompt to generate", {Color = {0.8, 0.6, 0.4, 1}})
     end
 
-    -- Generate Image button
+    -- Generate Image button (only uses page prompt)
     if state.isGenerating then
         Slab.Text("Generating...", {Color = {0.8, 0.8, 0.3, 1}})
     else
-        local canGenerate = hasPagePrompt or hasStoryPrompt
-        if Slab.Button("Generate Image", {W = inputW, Disabled = not canGenerate}) then
+        if Slab.Button("Generate Image", {W = inputW, Disabled = not hasPagePrompt}) then
             -- DEV_MODE: Use existing test image as placeholder
             page.image_path = "pics/Gemini_Generated_Image_rod070rod070rod0.png"
-
-            -- If used story prompt, clear it to prevent accidental re-trigger
-            if not hasPagePrompt and hasStoryPrompt then
-                state.story.general_image_prompt = ""
-                editor.showMessage("Image generated! (Story prompt cleared)")
-            else
-                editor.showMessage("Image generated (DEV_MODE)")
-            end
+            editor.showMessage("Image generated (DEV_MODE)")
         end
     end
 
@@ -910,6 +1061,7 @@ function editor.addPage()
     local newPage = {
         id = maxId + 1,
         image_path = "",
+        image_prompt = "",  -- Per-page prompt (overrides story prompt)
         question_text = "New question",
         hint_text = "",
         choice_labels = {"Yes", "No"},
@@ -989,8 +1141,16 @@ function editor.loadStory(filename)
         return
     end
 
+    -- Check if this is a legacy story (no cover_image_path before migration)
+    local hadCoverBefore = story.cover_image_path and story.cover_image_path ~= ""
+
     -- Migrate story from old format to new format
     story = schema.migrateStory(story)
+
+    -- Mark as legacy if it didn't have a cover (skip Pages panel gating)
+    if not hadCoverBefore then
+        story._isLegacy = true
+    end
 
     state.story = story
     state.selectedPageIndex = 1

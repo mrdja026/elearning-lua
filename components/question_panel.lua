@@ -8,7 +8,8 @@ local InputManager = require("ui.input_manager")
 local QuestionPanel = {}
 
 -- Draw the question panel content
-function QuestionPanel.draw(panel, btnLayout, page, gamestate)
+-- previewMode: if true, buttons are disabled for config mode preview
+function QuestionPanel.draw(panel, btnLayout, page, gamestate, previewMode)
     local questionType = page.question_type or "yesno"
 
     -- Draw question text
@@ -19,11 +20,11 @@ function QuestionPanel.draw(panel, btnLayout, page, gamestate)
 
     -- Draw answer UI based on question type
     if questionType == "yesno" then
-        QuestionPanel.drawYesNoAnswers(panel, btnLayout, page)
+        QuestionPanel.drawYesNoAnswers(panel, btnLayout, page, previewMode)
     elseif questionType == "text" then
-        QuestionPanel.drawTextAnswer(panel, page, gamestate)
+        QuestionPanel.drawTextAnswer(panel, page, gamestate, previewMode)
     elseif questionType == "multi" then
-        QuestionPanel.drawMultiAnswers(panel, page, gamestate)
+        QuestionPanel.drawMultiAnswers(panel, page, gamestate, previewMode)
     end
 end
 
@@ -63,7 +64,7 @@ function QuestionPanel.drawHint(panel, page)
 end
 
 -- Draw Yes/No choice buttons
-function QuestionPanel.drawYesNoAnswers(panel, btnLayout, page)
+function QuestionPanel.drawYesNoAnswers(panel, btnLayout, page, previewMode)
     local labels = page.choice_labels or {"Yes", "No"}
 
     local totalW = btnLayout.width * 2 + btnLayout.gap
@@ -71,9 +72,8 @@ function QuestionPanel.drawYesNoAnswers(panel, btnLayout, page)
     local btnY = panel.contentY + panel.contentHeight - btnLayout.height - Tokens.SPACING.lg
 
     -- Draw Yes button
-    local yesHovered = InputManager.isHovered("btn_yes")
-    local yesFocused = InputManager.isFocused("btn_yes")
-    local yesPressed = InputManager.isPressed("btn_yes")
+    local yesFocused = not previewMode and InputManager.isFocused("btn_yes")
+    local yesPressed = not previewMode and InputManager.isPressed("btn_yes")
 
     Widgets.button(
         startX,
@@ -85,13 +85,13 @@ function QuestionPanel.drawYesNoAnswers(panel, btnLayout, page)
             style = "primary",
             focused = yesFocused,
             pressed = yesPressed,
+            disabled = previewMode,
         }
     )
 
     -- Draw No button
-    local noHovered = InputManager.isHovered("btn_no")
-    local noFocused = InputManager.isFocused("btn_no")
-    local noPressed = InputManager.isPressed("btn_no")
+    local noFocused = not previewMode and InputManager.isFocused("btn_no")
+    local noPressed = not previewMode and InputManager.isPressed("btn_no")
 
     Widgets.button(
         startX + btnLayout.width + btnLayout.gap,
@@ -103,28 +103,36 @@ function QuestionPanel.drawYesNoAnswers(panel, btnLayout, page)
             style = "secondary",
             focused = noFocused,
             pressed = noPressed,
+            disabled = previewMode,
         }
     )
 end
 
 -- Draw text answer input
-function QuestionPanel.drawTextAnswer(panel, page, gamestate)
+function QuestionPanel.drawTextAnswer(panel, page, gamestate, previewMode)
     local inputW = math.min(400, panel.contentWidth - Tokens.SPACING.lg * 2)
     local inputH = Tokens.TOUCH.min_target
     local inputX = panel.contentX + (panel.contentWidth - inputW) / 2
     local inputY = panel.contentY + 120
 
-    -- Get current input text
-    local currentText = gamestate.getTextInput and gamestate.getTextInput() or ""
+    -- Get current input text (empty in preview mode)
+    local currentText = ""
+    if not previewMode and gamestate.getTextInput then
+        currentText = gamestate.getTextInput() or ""
+    end
 
-    -- Check for errors
-    local errors = gamestate.getErrors and gamestate.getErrors() or {}
-    local hasError = errors[1] ~= nil
+    -- Check for errors (none in preview mode)
+    local hasError = false
+    if not previewMode then
+        local errors = gamestate.getErrors and gamestate.getErrors() or {}
+        hasError = errors[1] ~= nil
+    end
 
     -- Draw input field
     Widgets.inputField(inputX, inputY, inputW, inputH, currentText, {
         placeholder = "Type your answer...",
-        focused = true,  -- Text input is always focused in text mode
+        focused = not previewMode,
+        disabled = previewMode,
     })
 
     -- Draw error message if present
@@ -142,26 +150,31 @@ function QuestionPanel.drawTextAnswer(panel, page, gamestate)
     local btnX = panel.contentX + (panel.contentWidth - btnW) / 2
     local btnY = panel.contentY + panel.contentHeight - btnH - Tokens.SPACING.lg
 
-    local submitFocused = InputManager.isFocused("btn_submit")
-    local submitPressed = InputManager.isPressed("btn_submit")
+    local submitFocused = not previewMode and InputManager.isFocused("btn_submit")
+    local submitPressed = not previewMode and InputManager.isPressed("btn_submit")
 
     Widgets.button(btnX, btnY, btnW, btnH, "Submit", {
         style = "success",
         focused = submitFocused,
         pressed = submitPressed,
+        disabled = previewMode,
     })
 
     love.graphics.setColor(1, 1, 1, 1)
 end
 
 -- Draw multi-question answers
-function QuestionPanel.drawMultiAnswers(panel, page, gamestate)
+function QuestionPanel.drawMultiAnswers(panel, page, gamestate, previewMode)
     local questions = page.questions or {}
     local startY = panel.contentY + 100
     local spacing = 70
 
-    local errors = gamestate.getErrors and gamestate.getErrors() or {}
-    local activeInput = gamestate.getActiveInput and gamestate.getActiveInput() or 1
+    local errors = {}
+    local activeInput = 1
+    if not previewMode then
+        errors = gamestate.getErrors and gamestate.getErrors() or {}
+        activeInput = gamestate.getActiveInput and gamestate.getActiveInput() or 1
+    end
 
     for i, q in ipairs(questions) do
         local y = startY + (i - 1) * spacing
@@ -173,9 +186,9 @@ function QuestionPanel.drawMultiAnswers(panel, page, gamestate)
         local qText = i .. ". " .. (q.question_text or "")
         love.graphics.printf(qText, panel.contentX, y, panel.contentWidth, "center")
 
-        -- Get answer for this question
+        -- Get answer for this question (empty in preview mode)
         local answer = ""
-        if gamestate.getMultiAnswer then
+        if not previewMode and gamestate.getMultiAnswer then
             answer = gamestate.getMultiAnswer(i) or ""
         end
 
@@ -191,10 +204,11 @@ function QuestionPanel.drawMultiAnswers(panel, page, gamestate)
         end
 
         -- Draw input field
-        local isActive = activeInput == i
+        local isActive = not previewMode and activeInput == i
         Widgets.inputField(inputX, y + 22, inputW, 32, answer, {
             placeholder = "Answer...",
             focused = isActive,
+            disabled = previewMode,
         })
 
         -- Draw error indicator
@@ -211,13 +225,14 @@ function QuestionPanel.drawMultiAnswers(panel, page, gamestate)
         local btnX = panel.contentX + (panel.contentWidth - btnW) / 2
         local btnY = panel.contentY + panel.contentHeight - btnH - Tokens.SPACING.lg
 
-        local submitFocused = InputManager.isFocused("btn_submit_all")
-        local submitPressed = InputManager.isPressed("btn_submit_all")
+        local submitFocused = not previewMode and InputManager.isFocused("btn_submit_all")
+        local submitPressed = not previewMode and InputManager.isPressed("btn_submit_all")
 
         Widgets.button(btnX, btnY, btnW, btnH, "Submit All", {
             style = "success",
             focused = submitFocused,
             pressed = submitPressed,
+            disabled = previewMode,
         })
     end
 
