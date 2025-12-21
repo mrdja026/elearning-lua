@@ -6,6 +6,11 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
+    headers: {
+      // Required for SharedArrayBuffer (Love.js WASM threading)
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
   build: {
     outDir: 'dist',

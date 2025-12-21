@@ -127,7 +127,6 @@
         }
     </script>
 
-    <script type="text/javascript" src="love.js"></script>
     <script type="text/javascript">
         var loadingDiv = document.getElementById('loading');
         var progressBar = document.getElementById('progress-bar');
@@ -144,10 +143,11 @@
                 if (Module.setStatus.last !== text) {
                     Module.setStatus.last = text;
 
-                    // Parse progress from text like "Downloading... (50%)"
-                    var match = text.match(/(\d+)%/);
+                    // Parse progress from text like "Downloading data... (X/Y)"
+                    var match = text.match(/\((\d+)\/(\d+)\)/);
                     if (match) {
-                        progressBar.style.width = match[1] + '%';
+                        var percent = Math.round((parseInt(match[1]) / parseInt(match[2])) * 100);
+                        progressBar.style.width = percent + '%';
                     }
                     statusText.textContent = text || 'Ready!';
 
@@ -172,20 +172,7 @@
 
             onRuntimeInitialized: function() {
                 console.log('[love.js] Runtime initialized');
-
-                // Inject the postToReact function into Lua globals
-                // This will be accessible as _G.postToReact in Lua
-                if (Module.ccall) {
-                    try {
-                        // Create a JavaScript function that Lua can call
-                        Module.addFunction = Module.addFunction || function() {};
-
-                        // Expose postToReact to Lua
-                        window.Module = Module;
-                    } catch (e) {
-                        console.warn('[bridge] Could not setup Lua bridge:', e);
-                    }
-                }
+                window.Module = Module;
             }
         };
 
@@ -196,5 +183,8 @@
 
         Module.setStatus('Downloading...');
     </script>
+    <!-- game.js must load before love.js to set up data loading -->
+    <script type="text/javascript" src="game.js"></script>
+    <script type="text/javascript" src="love.js"></script>
 </body>
 </html>

@@ -1,10 +1,27 @@
+-- Detect web mode early
+local IS_WEB = love.system.getOS() == "Web"
+
+-- TODO: Enable editor in web mode
+-- The editor uses Slab UI library which requires LuaJIT (bit, ffi modules).
+-- To enable editor in web mode, either:
+-- 1. Replace Slab with SUIT (https://github.com/vrld/suit) - pure Lua, Love.js compatible
+-- 2. Extend the existing custom UI system (ui/widgets.lua) for editor panels
+-- For now, web mode is play-only.
+
 local json = require("libraries.json")
-local Slab = require("libraries.Slab")
+local Slab = nil
+local editor = nil
+
+-- Only load Slab and editor in native mode (LuaJIT available)
+if not IS_WEB then
+    Slab = require("libraries.Slab")
+    editor = require("editor")
+end
+
 local schema = require("schema")
 local gamestate = require("gamestate")
 local logic = require("logic")
 local renderer = require("renderer")
-local editor = require("editor")
 local bridge = require("bridge")
 
 -- New UI system modules
@@ -15,22 +32,27 @@ local InputManager = require("ui.input_manager")
 local PlayScreen = require("screens.play")
 local Decorations = require("ui.decorations")
 
-local APP_MODE = "create"
+-- Web mode is play-only, native mode starts in create mode
+local APP_MODE = IS_WEB and "play" or "create"
 local errorMessage = nil
 
 -- Preview canvas for config mode (renders PlayScreen at virtual resolution)
 local previewCanvas = nil
 
 -- Mock gamestate for preview mode (wraps editor's current page)
-local previewGamestate = {
-    getCurrentPage = function()
-        return editor.getCurrentPage()
-    end,
-    getTextInput = function() return "" end,
-    getMultiAnswer = function() return "" end,
-    getActiveInput = function() return 1 end,
-    getErrors = function() return {} end,
-}
+-- Only used in native mode when editor is available
+local previewGamestate = nil
+if not IS_WEB then
+    previewGamestate = {
+        getCurrentPage = function()
+            return editor.getCurrentPage()
+        end,
+        getTextInput = function() return "" end,
+        getMultiAnswer = function() return "" end,
+        getActiveInput = function() return 1 end,
+        getErrors = function() return {} end,
+    }
+end
 
 function love.load()
     -- Set default font
@@ -42,7 +64,9 @@ function love.load()
 
     -- Initialize UI systems
     Layout.init()
-    Slab.Initialize({})
+    if Slab then
+        Slab.Initialize({})
+    end
     Style.initialize()
     InputManager.init()
 
@@ -51,7 +75,9 @@ function love.load()
 
     -- Initialize game systems
     gamestate.init()
-    editor.init()
+    if editor then
+        editor.init()
+    end
     PlayScreen.init()
 
     -- Set up play screen callbacks
@@ -76,6 +102,10 @@ function love.load()
         local valid, err = schema.validateStory(story)
         if valid then
             gamestate.loadStory(story)
+            -- In web mode, we start directly in play mode
+            if IS_WEB then
+                PlayScreen.enter(gamestate)
+            end
         end
     end
 end
@@ -103,7 +133,7 @@ function love.update(dt)
     -- Update input manager (handles pointer/touch abstraction)
     InputManager.update(dt)
 
-    if APP_MODE == "create" then
+    if APP_MODE == "create" and Slab and editor then
         Slab.Update(dt)
         editor.update(dt)
     else
@@ -118,13 +148,16 @@ function love.resize(w, h)
 end
 
 function love.draw()
-    if APP_MODE == "create" then
+    if APP_MODE == "create" and Slab and editor then
         drawCreateMode()
     else
         drawPlayMode()
     end
 
-    drawModeIndicator()
+    -- Only show mode indicator in native mode (where switching is possible)
+    if not IS_WEB then
+        drawModeIndicator()
+    end
 end
 
 function drawCreateMode()
@@ -263,7 +296,7 @@ end
 function love.mousepressed(x, y, button)
     if button ~= 1 then return end
 
-    if APP_MODE == "create" then
+    if APP_MODE == "create" and editor then
         -- Handle custom thumbnail panel clicks (before Slab processes)
         if editor.handleThumbnailClick(x, y) then
             return
@@ -307,11 +340,14 @@ function love.mousepressed(x, y, button)
 end
 
 function love.keypressed(key)
-    if key == "tab" then
+    -- Tab to switch modes (only in native mode where editor is available)
+    if key == "tab" and not IS_WEB then
         if APP_MODE == "create" then
             APP_MODE = "play"
             -- Clear Slab's focused input to prevent it from capturing keystrokes in play mode
-            Slab.SetInputFocus(nil)
+            if Slab then
+                Slab.SetInputFocus(nil)
+            end
             local story = editor.getStory()
             local valid, err = schema.validateStory(story)
             if valid then
@@ -329,7 +365,7 @@ function love.keypressed(key)
         return
     end
 
-    if APP_MODE == "create" then
+    if APP_MODE == "create" and editor then
         editor.keypressed(key)
     else
         -- Handle Story Frame dismissal (any key except tab)
@@ -354,7 +390,7 @@ function love.keypressed(key)
 end
 
 function love.textinput(text)
-    if APP_MODE == "create" then
+    if APP_MODE == "create" and editor then
         editor.textinput(text)
     else
         local page = gamestate.getCurrentPage()

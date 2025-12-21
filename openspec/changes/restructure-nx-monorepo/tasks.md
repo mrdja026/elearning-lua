@@ -151,11 +151,13 @@
 
 ### 5.2 Integration Testing
 
-- [ ] 5.2.1 Test full flow: Game requests image → React calls API → Game receives image
-- [ ] 5.2.2 Test story save/load via Tauri fs API
-- [ ] 5.2.3 Test native Love2D mode with bridge fallback
-- [ ] 5.2.4 Build and test Tauri distributable on Windows
-- [ ] 5.2.5 Build and test Tauri distributable on macOS
+- [x] 5.2.1 Love.js game loads and runs in browser (play mode only)
+- [ ] 5.2.2 Fix Tauri app iframe loading (game works at /game/index.html but not in React iframe)
+- [ ] 5.2.3 Test full flow: Game requests image → React calls API → Game receives image
+- [ ] 5.2.4 Test story save/load via Tauri fs API
+- [ ] 5.2.5 Test native Love2D mode with bridge fallback
+- [ ] 5.2.6 Build and test Tauri distributable on Windows
+- [ ] 5.2.7 Build and test Tauri distributable on macOS
 
 ### 5.3 Documentation
 

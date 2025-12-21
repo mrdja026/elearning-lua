@@ -1,7 +1,11 @@
 -- ui/style.lua
 -- Configure Slab UI library with design system tokens
 
-local Slab = require("libraries.Slab")
+local IS_WEB = love.system.getOS() == "Web"
+local Slab = nil
+if not IS_WEB then
+    Slab = require("libraries.Slab")
+end
 local Tokens = require("ui.tokens")
 
 local Style = {}
@@ -11,8 +15,11 @@ local function toSlabColor(color)
     return {color[1], color[2], color[3], color[4] or 1}
 end
 
--- Initialize Slab with design tokens
+-- Initialize Slab with design tokens (native mode only)
 function Style.initialize()
+    -- Skip in web mode (Slab not available)
+    if not Slab then return end
+
     -- Get Slab's style table
     local style = Slab.GetStyle()
 

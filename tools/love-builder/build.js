@@ -53,12 +53,12 @@ async function build() {
       cwd: TEMP_DIR,
     })
 
-    // Replace default index.html with custom template
-    if (existsSync(INDEX_TEMPLATE)) {
-      console.log('[love-builder] Applying custom index.html template...')
-      const template = readFileSync(INDEX_TEMPLATE, 'utf-8')
-      writeFileSync(join(OUTPUT_DIR, 'index.html'), template)
-    }
+    // Skip custom template for now - use love.js default
+    // if (existsSync(INDEX_TEMPLATE)) {
+    //   console.log('[love-builder] Applying custom index.html template...')
+    //   const template = readFileSync(INDEX_TEMPLATE, 'utf-8')
+    //   writeFileSync(join(OUTPUT_DIR, 'index.html'), template)
+    // }
   } catch (error) {
     console.error('[love-builder] love.js compilation failed:', error)
     console.log('[love-builder] Falling back to placeholder...')
