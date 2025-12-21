@@ -1,146 +1,212 @@
 # LogicTales
 
-An educational children's game that combines storytelling with logic puzzles. Players navigate through interactive stories where branching paths are determined by math and logic decisions.
+Educational storytelling game with AI-generated content. Create interactive stories with branching logic, AI-generated images, and voice input.
 
-## Features
+## Architecture
 
-- **Play Mode** - Play through interactive stories with branching logic
-- **Creator Studio** - Build your own stories with a visual editor
-- **AI Image Generation** - Generate illustrations using AI (Stability AI + Gemini)
-- **Marketplace** - Share and download community stories (coming soon)
+```
++------------------+     +------------------+     +------------------+
+|                  |     |                  |     |                  |
+|    Love2D Game   |     |   Hono Backend   |     |   Tauri Shell    |
+|       (Lua)      |     |   (TypeScript)   |     |     (Rust)       |
+|                  |     |                  |     |                  |
++--------+---------+     +--------+---------+     +--------+---------+
+         |                        |                        |
+         v                        v                        v
++------------------+     +------------------+     +------------------+
+|                  |     |                  |     |                  |
+|     Love.js      |     |   Google ADK     |     |   React + Vite   |
+|     (WASM)       |     |    (Agents)      |     |   (Frontend)     |
+|                  |     |                  |     |                  |
++--------+---------+     +------------------+     +--------+---------+
+         |                                                 |
+         +-------------------------+-----------------------+
+                                   |
+                                   v
+                          +------------------+
+                          |                  |
+                          |   Desktop App    |
+                          |    (Windows/     |
+                          |     macOS)       |
+                          |                  |
+                          +------------------+
+```
 
-## Tech Stack
+## How It Fits Together
 
-### Game Client
-- **LOVE2D** - Lua-based 2D game framework
-- **Slab** - Immediate Mode GUI library for Creator Studio
+```
+Native Development:
+  love apps/game  -->  Love2D Window (full editor)
 
-### Backend
-- **Hono** - TypeScript web framework
-- **Supabase** - PostgreSQL database with authentication
-- **Gemini** - Prompt optimization for image generation
-- **Stability AI** - Image generation
-- **Cloudinary** - Image hosting
+Web Build:
+  apps/game/*.lua  -->  [love.js]  -->  game.wasm + game.js
+                                              |
+                                              v
+                                    apps/app/public/game/
 
-## Prerequisites
+Desktop App:
+  +-------------------------------------------------------+
+  |  Tauri (Rust)                                         |
+  |  +--------------------------------------------------+ |
+  |  |  React (TypeScript)                              | |
+  |  |  +---------------------------------------------+ | |
+  |  |  |  iframe                                     | | |
+  |  |  |  +----------------------------------------+ | | |
+  |  |  |  |  Love.js Game (WASM)                   | | | |
+  |  |  |  |                                        | | | |
+  |  |  |  |  [Play Mode Only - No Editor]          | | | |
+  |  |  |  +----------------------------------------+ | | |
+  |  |  +---------------------------------------------+ | |
+  |  +--------------------------------------------------+ |
+  +-------------------------------------------------------+
+```
 
-- [LOVE2D](https://love2d.org/) (11.x or later)
-- [Node.js](https://nodejs.org/) (18.x or later)
-- API keys (see below)
+## Communication Flow
+
+```
++-------------+    postMessage    +-------------+    HTTP    +-------------+
+|             | ----------------> |             | ---------> |             |
+|  Love.js    |                   |   React     |            |   Backend   |
+|  Game       | <---------------- |   App       | <--------- |   (Hono)    |
+|             |    postMessage    |             |    JSON    |             |
++-------------+                   +-------------+            +-------------+
+                                        |
+                                        | Tauri API
+                                        v
+                                  +-------------+
+                                  |   Local     |
+                                  |   Files     |
+                                  |   (fs)      |
+                                  +-------------+
+```
 
 ## Project Structure
 
 ```
-eai-learning/
-├── main.lua              # Game entry point
-├── screens/              # Game screens (play, creator)
-├── components/           # UI components
-├── libraries/            # Lua libraries (Slab, json)
-├── stories/              # Story JSON files
-├── backend/              # Node.js API server
-│   ├── src/
-│   │   ├── routes/       # API endpoints
-│   │   ├── services/     # Business logic
-│   │   └── middleware/   # Auth middleware
-│   └── supabase/         # Database scripts
-└── openspec/             # Project specifications
+logictales/
+|-- apps/
+|   |-- backend/          # Hono API server + Google ADK agents
+|   |   |-- src/
+|   |   |   |-- agents/   # AI agents (storyteller, researcher, critic)
+|   |   |   |-- routes/   # API endpoints
+|   |   |   +-- index.ts  # Server entry
+|   |   +-- package.json
+|   |
+|   |-- game/             # Love2D game (Lua)
+|   |   |-- main.lua      # Entry point
+|   |   |-- editor.lua    # Story editor (native only)
+|   |   |-- bridge.lua    # React communication
+|   |   |-- screens/      # Game screens
+|   |   |-- components/   # UI components
+|   |   +-- stories/      # Story files
+|   |
+|   +-- app/              # React + Tauri desktop shell
+|       |-- src/
+|       |   |-- components/
+|       |   |   +-- GameRunner.tsx
+|       |   +-- App.tsx
+|       |-- public/
+|       |   +-- game/     # Love.js output (generated)
+|       +-- src-tauri/    # Tauri config (Rust)
+|
+|-- tools/
+|   +-- love-builder/     # Love.js build pipeline
+|
+|-- openspec/             # Change specifications
++-- package.json          # Root scripts
 ```
 
-## Setup
+## Dependencies
 
-### 1. Clone and Install
+### System Requirements
+
+| Dependency | Version | Purpose |
+|------------|---------|---------|
+| Node.js    | >= 18   | Runtime |
+| pnpm       | latest  | Package manager |
+| Love2D     | 11.4+   | Native game development |
+| Rust       | latest  | Tauri builds |
+
+### Install
 
 ```bash
-git clone <repo-url>
-cd eai-learning
+# Install pnpm if needed
+npm install -g pnpm
 
-# Install backend dependencies
-cd backend
-npm install
+# Install project dependencies
+pnpm install
 ```
 
-### 2. Configure Environment
+## Running
 
-Copy the example environment file:
+### Quick Start
 
 ```bash
-cp backend/.env.example backend/.env
+# Run backend + React app
+pnpm dev
 ```
 
-Edit `backend/.env` with your keys:
+### All Modes
 
-```env
-# Development mode - skips all API calls, returns mock data
-DEV_MODE=true
+| Command | What it does |
+|---------|--------------|
+| `pnpm dev` | Backend + React app (parallel) |
+| `pnpm dev:backend` | Hono API only (port 3000) |
+| `pnpm dev:game` | Native Love2D with editor |
+| `pnpm dev:tauri` | Desktop app (Tauri + Vite) |
+| `pnpm build:game` | Compile Lua to WASM |
+| `pnpm build:app` | Build distributable |
 
-# AI Pipeline (not needed when DEV_MODE=true)
-GEMINI_API_KEY=your_gemini_key
-STABILITY_API_KEY=your_stability_key
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_cloudinary_key
-CLOUDINARY_API_SECRET=your_cloudinary_secret
+### Mode Comparison
 
-# Supabase (not needed when DEV_MODE=true)
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
++------------------+------------------+------------------+
+|  Native Love2D   |    Web/Tauri     |     Backend      |
++------------------+------------------+------------------+
+|  pnpm dev:game   |  pnpm dev:tauri  |  pnpm dev:backend|
++------------------+------------------+------------------+
+|  Full editor     |  Play only       |  API server      |
+|  LuaJIT          |  WASM            |  Google ADK      |
+|  Slab UI         |  No Slab         |  Image gen       |
+|  Fast iteration  |  Desktop app     |  Story gen       |
++------------------+------------------+------------------+
 ```
 
-### 3. Database Setup (Optional - not needed for DEV_MODE)
+## Development Workflow
 
-1. Create a [Supabase](https://supabase.com/) project
-2. Run the SQL scripts in order:
-   - `backend/supabase/01_tables.sql`
-   - `backend/supabase/02_rls.sql`
+```
+1. Edit story content:
+   +-- love apps/game  (native, has editor)
 
-## Running the Project
+2. Test web build:
+   +-- pnpm build:game
+   +-- pnpm dev:tauri
 
-### Backend Server
-
-```bash
-cd backend
-npm run dev
+3. Test with AI features:
+   +-- pnpm dev  (runs backend + app)
 ```
 
-Server runs at `http://localhost:3000`
+## Tech Stack
 
-### Game Client
-
-```bash
-# From project root
-love .
+```
+Frontend:        Backend:         Desktop:         Game:
++-----------+    +-----------+    +-----------+    +-----------+
+| React     |    | Hono      |    | Tauri v2  |    | Love2D    |
+| Vite      |    | Google    |    | Rust      |    | Lua       |
+| TypeScript|    | ADK       |    | WebView   |    | Love.js   |
++-----------+    +-----------+    +-----------+    +-----------+
 ```
 
-Or on Windows, drag the project folder onto `love.exe`.
+## Web Mode Limitations
 
-## API Keys
+The web (Love.js) version runs in **play mode only**:
 
-| Service | Purpose | Get Key From |
-|---------|---------|--------------|
-| Gemini | Prompt optimization | [Google AI Studio](https://aistudio.google.com/) |
-| Stability AI | Image generation | [Stability Platform](https://platform.stability.ai/) |
-| Cloudinary | Image hosting | [Cloudinary Console](https://cloudinary.com/) |
-| Supabase | Database + Auth | [Supabase Dashboard](https://supabase.com/) |
+- No story editor (Slab UI requires LuaJIT)
+- Stories must be pre-loaded
+- 512MB memory cap
 
-## Development Mode
-
-Set `DEV_MODE=true` in `backend/.env` to:
-- Skip all external API calls
-- Return mock image URLs
-- Skip database operations
-- Skip authentication
-
-This allows full development without any API keys or credits.
-
-## Game Controls
-
-| Key | Action |
-|-----|--------|
-| Tab | Switch between Play/Create modes |
-| Arrow Keys | Navigate choices |
-| Enter/Space | Select choice |
-| Escape | Close dialogs |
+For story editing, use native Love2D: `pnpm dev:game`
 
 ## License
 
-ISC
+MIT
