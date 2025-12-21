@@ -1,0 +1,29 @@
+{
+  "name": "@logictales/root",
+  "version": "0.0.0",
+  "private": true,
+  "description": "LogicTales - Educational storytelling game with AI-generated content",
+  "scripts": {
+    "dev": "nx run-many --target=dev --projects=backend,app --parallel",
+    "dev:backend": "nx dev backend",
+    "dev:app": "nx dev app",
+    "dev:game": "love apps/game",
+    "build": "nx run-many --target=build --all",
+    "build:app": "nx build app",
+    "build:game": "node tools/love-builder/build.js"
+  },
+  "workspaces": [
+    "apps/*",
+    "tools/*"
+  ],
+  "devDependencies": {
+    "nx": "^20.3.0",
+    "@nx/vite": "^20.3.0",
+    "@nx/react": "^20.3.0",
+    "@nx/node": "^20.3.0",
+    "@nx/js": "^20.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

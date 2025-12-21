@@ -1,0 +1,24 @@
+{
+  "name": "game",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/game",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "love .",
+        "cwd": "apps/game"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node ../../tools/love-builder/build.js",
+        "cwd": "apps/game"
+      },
+      "outputs": ["{workspaceRoot}/apps/app/public/game"]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "backend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/backend/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx watch src/index.ts",
+        "cwd": "apps/backend"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc",
+        "cwd": "apps/backend"
+      },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node dist/index.js",
+        "cwd": "apps/backend"
+      },
+      "dependsOn": ["build"]
+    }
+  }
+}

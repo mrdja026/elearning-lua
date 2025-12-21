@@ -17,7 +17,8 @@
       "WebFetch(domain:ai.google.dev)",
       "Skill(openspec:proposal)",
       "WebFetch(domain:github.com)",
-      "Skill(openspec:apply)"
+      "Skill(openspec:apply)",
+      "Bash(powershell:*)"
     ]
   },
   "spinnerTipsEnabled": true

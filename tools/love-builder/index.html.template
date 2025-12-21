@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogicTales</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1a1a2e;
+        }
+
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            text-align: center;
+        }
+
+        #loading h1 {
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+
+        #progress {
+            width: 300px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: #4f46e5;
+            transition: width 0.3s;
+        }
+
+        #status {
+            margin-top: 12px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <h1>LogicTales</h1>
+        <div id="progress">
+            <div id="progress-bar"></div>
+        </div>
+        <div id="status">Loading...</div>
+    </div>
+
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+    <script type="text/javascript">
+        // PostMessage Bridge for React communication
+        window.gameBridge = {
+            ready: false,
+            moduleInstance: null,
+
+            // Send message to Lua via _G.onReactMessage
+            sendToGame: function(message) {
+                if (!this.ready || !this.moduleInstance) {
+                    console.warn('[bridge] Game not ready yet');
+                    return;
+                }
+
+                try {
+                    var jsonStr = JSON.stringify(message);
+                    // Call the Lua global function
+                    if (this.moduleInstance._LOVEJS_onReactMessage) {
+                        this.moduleInstance._LOVEJS_onReactMessage(jsonStr);
+                    }
+                } catch (e) {
+                    console.error('[bridge] Failed to send message to game:', e);
+                }
+            },
+
+            // Called by Lua to send messages to React
+            postToReact: function(jsonStr) {
+                try {
+                    var message = JSON.parse(jsonStr);
+                    window.parent.postMessage({
+                        source: 'logictales-game',
+                        ...message
+                    }, '*');
+                } catch (e) {
+                    console.error('[bridge] Failed to parse message from game:', e);
+                }
+            }
+        };
+
+        // Listen for messages from React parent
+        window.addEventListener('message', function(event) {
+            // Only handle messages intended for the game
+            if (event.data && event.data.target === 'logictales-game') {
+                window.gameBridge.sendToGame(event.data);
+            }
+        });
+
+        // Notify parent when game is ready
+        function notifyReady() {
+            window.parent.postMessage({
+                source: 'logictales-game',
+                type: 'GAME_READY'
+            }, '*');
+        }
+    </script>
+
+    <script type="text/javascript" src="love.js"></script>
+    <script type="text/javascript">
+        var loadingDiv = document.getElementById('loading');
+        var progressBar = document.getElementById('progress-bar');
+        var statusText = document.getElementById('status');
+
+        var Module = {
+            arguments: ['./game.love'],
+            INITIAL_MEMORY: 536870912, // 512MB
+            printErr: console.error.bind(console),
+            print: console.log.bind(console),
+            canvas: document.getElementById('canvas'),
+
+            setStatus: function(text) {
+                if (Module.setStatus.last !== text) {
+                    Module.setStatus.last = text;
+
+                    // Parse progress from text like "Downloading... (50%)"
+                    var match = text.match(/(\d+)%/);
+                    if (match) {
+                        progressBar.style.width = match[1] + '%';
+                    }
+                    statusText.textContent = text || 'Ready!';
+
+                    if (!text) {
+                        // Loading complete
+                        loadingDiv.style.display = 'none';
+                        window.gameBridge.ready = true;
+                        window.gameBridge.moduleInstance = Module;
+                        notifyReady();
+                    }
+                }
+            },
+
+            totalDependencies: 0,
+
+            monitorRunDependencies: function(left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                Module.setStatus(left
+                    ? 'Loading... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
+                    : '');
+            },
+
+            onRuntimeInitialized: function() {
+                console.log('[love.js] Runtime initialized');
+
+                // Inject the postToReact function into Lua globals
+                // This will be accessible as _G.postToReact in Lua
+                if (Module.ccall) {
+                    try {
+                        // Create a JavaScript function that Lua can call
+                        Module.addFunction = Module.addFunction || function() {};
+
+                        // Expose postToReact to Lua
+                        window.Module = Module;
+                    } catch (e) {
+                        console.warn('[bridge] Could not setup Lua bridge:', e);
+                    }
+                }
+            }
+        };
+
+        window.onerror = function(event) {
+            Module.setStatus('Error: See console');
+            console.error('Game error:', event);
+        };
+
+        Module.setStatus('Downloading...');
+    </script>
+</body>
+</html>
