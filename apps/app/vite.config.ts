@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    strictPort: false,
+    strictPort: true, // Fail if port busy (Tauri expects exactly 5173)
     headers: {
       // Required for SharedArrayBuffer (Love.js WASM threading)
       'Cross-Origin-Opener-Policy': 'same-origin',

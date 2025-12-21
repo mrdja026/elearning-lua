@@ -62,16 +62,17 @@ http://localhost:5174/game/index.html
 ### 4. React + Tauri App (Desktop Shell)
 
 ```bash
-# Build game assets first
+# Build game assets first (only needed once, or after game changes)
 pnpm build:game
 
-# Run Tauri dev mode
-pnpm nx tauri:dev app
+# Run Tauri dev mode (single command - starts Vite + Tauri)
+pnpm dev:tauri
 ```
 
 - Tauri v2 desktop wrapper
 - React frontend with GameRunner iframe
-- **Status: iframe not loading game yet (WIP)**
+- Game runs in Love.js WASM inside the app
+- **Note:** Port 5173 must be free (Vite uses strictPort)
 
 ### 5. Full Stack Development
 
@@ -80,6 +81,7 @@ pnpm dev
 ```
 
 Runs in parallel:
+
 - Backend on `http://localhost:3000`
 - React app on `http://localhost:5174`
 
@@ -87,11 +89,11 @@ Runs in parallel:
 
 ## Build Commands
 
-| Command | Description |
-|---------|-------------|
+| Command           | Description                   |
+| ----------------- | ----------------------------- |
 | `pnpm build:game` | Compile Love2D → Love.js WASM |
-| `pnpm build:app` | Build Tauri distributable |
-| `pnpm build` | Build all packages |
+| `pnpm build:app`  | Build Tauri distributable     |
+| `pnpm build`      | Build all packages            |
 
 ---
 
@@ -126,7 +128,9 @@ See TODO in `apps/game/main.lua` for details.
 ## Troubleshooting
 
 ### "SharedArrayBuffer is not defined"
+
 Vite needs COOP/COEP headers. Check `apps/app/vite.config.ts`:
+
 ```ts
 server: {
   headers: {
@@ -137,6 +141,7 @@ server: {
 ```
 
 ### Port 3000 already in use
+
 ```bash
 # Windows
 netstat -ano | findstr :3000
@@ -147,7 +152,16 @@ Stop-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess -Force
 ```
 
 ### Game not loading in iframe
-Known issue - game works at `/game/index.html` directly but not in React iframe. WIP.
+
+Fixed: Ensure the parent div has explicit dimensions:
+
+```tsx
+<div style={{ width: '100vw', height: '100vh' }}>
+  <GameRunner ... />
+</div>
+```
+
+And the iframe has `display: block` (prevents inline spacing issues).
 
 ---
 
@@ -157,26 +171,37 @@ Known issue - game works at `/game/index.html` directly but not in React iframe.
 Continue the Nx monorepo restructure (openspec change: restructure-nx-monorepo).
 
 Current status:
-- Love.js game works at http://localhost:5174/game/index.html (play mode only)
+- Love.js game works at http://localhost:5173/game/ (play mode only)
+- I can open game in iframe from tauri shell
 - Editor disabled in web mode (Slab requires LuaJIT - see TODO in main.lua)
 - Backend synced with GADK (Google Agent Kit) agents
+- React iframe fixed (GameRunner.tsx with 100vw/100vh wrapper)
+- Tauri app works with `pnpm dev:tauri`
 
-Remaining tasks:
-1. Fix React iframe - GameRunner.tsx loads /game/index.html but game doesn't appear
-   - Game works when accessed directly, fails in iframe
-   - Check if COOP/COEP headers break iframe embedding
-2. Test Tauri app with `pnpm nx tauri:dev app`
-3. Test full bridge flow: Game → React → Backend → Game
-4. Phase 5.2 integration testing
+Remaining tasks (Phase 5.2 Integration Testing):
+1. Test full bridge flow: Game → React → Backend → Game (5.2.4)
+2. Test story save/load via Tauri fs API (5.2.5)
+3. Test native Love2D mode with bridge fallback (5.2.6)
+4. Build and test Tauri distributable on Windows (5.2.7)
+5. Build and test Tauri distributable on macOS (5.2.8)
+
+Documentation tasks:
+- Update root README.md with new project structure (5.3.1)
+- Document build process for distributables (5.3.3)
 
 Commands:
-- `pnpm dev` - runs backend + React app
+- `pnpm dev` - runs backend + React app (parallel)
+- `pnpm dev:tauri` - runs Tauri app (starts Vite automatically)
 - `pnpm build:game` - compiles Love.js WASM to apps/app/public/game/
 - `pnpm dev:game` - runs native Love2D (has editor)
 
-Key files modified:
+Key files:
 - apps/game/main.lua - IS_WEB conditional, play-only mode
-- apps/game/ui/style.lua - conditional Slab loading
-- apps/app/vite.config.ts - COOP/COEP headers for SharedArrayBuffer
-- tools/love-builder/build.js - Windows-compatible love.js execution
+- apps/game/bridge.lua - PostMessage bridge for React communication
+- apps/app/src/App.tsx - GameRunner with message handling
+- apps/app/src/components/GameRunner.tsx - Iframe wrapper
+- apps/app/vite.config.ts - COOP/COEP headers, strictPort: true
+- apps/app/src-tauri/tauri.conf.json - devUrl: localhost:5173
+
+Note: Port 5173 must be free for Tauri dev mode (strictPort enforced).
 ```

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nx run-many --target=dev --projects=backend,app --parallel",
     "dev:backend": "nx dev backend",
-    "dev:app": "nx dev app",
+    "dev:app": "nx serve app",
+    "dev:tauri": "nx tauri:dev app",
     "dev:game": "love apps/game",
     "build": "nx run-many --target=build --all",
     "build:app": "nx build app",

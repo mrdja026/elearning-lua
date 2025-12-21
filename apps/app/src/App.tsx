@@ -14,12 +14,14 @@ function App() {
   }, [handleGameMessage])
 
   return (
-    <GameRunner
-      gamePath="/game/index.html"
-      onGameReady={onGameReady}
-      onGameMessage={onGameMessage}
-      sendToGame={sendToGame}
-    />
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <GameRunner
+        gamePath="/game/index.html"
+        onGameReady={onGameReady}
+        onGameMessage={onGameMessage}
+        sendToGame={sendToGame}
+      />
+    </div>
   )
 }
 

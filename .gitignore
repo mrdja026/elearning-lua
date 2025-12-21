@@ -48,3 +48,4 @@ coverage/
 
 # Tauri
 apps/app/src-tauri/target/
+apps/app/.vite

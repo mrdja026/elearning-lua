@@ -49,9 +49,10 @@ export function GameRunner({
         width: '100%',
         height: '100%',
         border: 'none',
+        display: 'block',
       }}
       title="LogicTales Game"
-      allow="autoplay"
+      allow="autoplay; cross-origin-isolated"
     />
   )
 }

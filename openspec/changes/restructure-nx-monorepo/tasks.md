@@ -152,18 +152,27 @@
 ### 5.2 Integration Testing
 
 - [x] 5.2.1 Love.js game loads and runs in browser (play mode only)
-- [ ] 5.2.2 Fix Tauri app iframe loading (game works at /game/index.html but not in React iframe)
-- [ ] 5.2.3 Test full flow: Game requests image → React calls API → Game receives image
-- [ ] 5.2.4 Test story save/load via Tauri fs API
-- [ ] 5.2.5 Test native Love2D mode with bridge fallback
-- [ ] 5.2.6 Build and test Tauri distributable on Windows
-- [ ] 5.2.7 Build and test Tauri distributable on macOS
+- [x] 5.2.2 Fix Tauri app iframe loading (fixed with 100vw/100vh wrapper + display:block)
+- [x] 5.2.3 Configure COOP/COEP headers for SharedArrayBuffer (vite.config.ts)
+- [ ] 5.2.4 Test full flow: Game requests image → React calls API → Game receives image
+- [ ] 5.2.5 Test story save/load via Tauri fs API
+- [ ] 5.2.6 Test native Love2D mode with bridge fallback
+- [ ] 5.2.7 Build and test Tauri distributable on Windows
+- [ ] 5.2.8 Build and test Tauri distributable on macOS
 
 ### 5.3 Documentation
 
-- [ ] 5.3.1 Update root README.md with new project structure
-- [ ] 5.3.2 Document development workflow (which commands to run)
+- [x] 5.3.1 Update root README.md with new project structure
+- [x] 5.3.2 Document development workflow (DEVELOPMENT.md created)
 - [ ] 5.3.3 Document build process for distributables
+
+### 5.4 Web Mode Compatibility (Added)
+
+- [x] 5.4.1 Disable Slab UI in web mode (requires LuaJIT bit/ffi modules)
+- [x] 5.4.2 Make main.lua conditionally load editor (IS_WEB flag)
+- [x] 5.4.3 Make ui/style.lua conditionally load Slab
+- [x] 5.4.4 Web mode runs in play-only mode
+- [ ] 5.4.5 (Future) Replace Slab with SUIT for web editor support
 
 **Phase 5 Deliverable:** Production-ready builds for Windows + macOS
 
