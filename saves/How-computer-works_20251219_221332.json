@@ -1,0 +1,82 @@
+{
+  "title": "Sparky the Sprite (a tiny's Adventure: How computer works",
+  "topic": "How computer works",
+  "general_image_prompt": "Imagine a tiny, sparkling town inside your computer called 'Bitville'! Each little house is a special worker. There's Zip the Zapper, who sends quick messages like lightning. Flicker the Follower, who remembers all the colors and pictures. And Whiz the Wonder, who is the boss and tells everyone what to do! One day, a naughty pixel tries to hide a secret cookie recipe. How will Zip, Flicker, and Whiz work together, using their special jobs, to find the missing recipe and make the computer happy again? What sounds do you think Bitville makes? What does it feel like inside the speedy wires?",
+  "cover_image_path": "images/cover_1766178885673.png",
+  "target_age": "5-8",
+  "art_style": "cartoon",
+  "pages": [
+    {
+      "id": 1,
+      "image_path": "images/page1_1766178885673.png",
+      "image_prompt": "A cute, friendly cartoon robot with a big, shiny red 'ON' button on its chest. The robot is standing in a bright, cheerful room. A child's hand is reaching out to gently push the red button. As the button is pushed, the robot's eyes glow with energy, and it smiles widely, starting to excitedly sort colorful building blocks into different piles. The style is clean, simple, and colorful, perfect for young children.",
+      "hint_text": "Comnputer with a button on it",
+      "visual_metaphor": "A friendly robot character with a big, shiny red button on its chest. When the button is pushed, the robot's eyes light up, and it starts happily buzzing and performing a task, like sorting colorful blocks or drawing a picture.",
+      "question_text": "Did you understand this concept?",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    },
+    {
+      "id": 2,
+      "image_path": "images/page2_1766178885673.png",
+      "image_prompt": "A friendly, cartoon robot chef with a colorful panel of buttons on its belly. One button is labeled 'Make Sandwich'. A child's finger is pressing this button. The robot is mid-action, with gears turning, lights blinking, and a yummy sandwich emerging from a little compartment. The background is a cheerful kitchen. The style is a bright, simple cartoon suitable for young children.",
+      "hint_text": "Pressing the button",
+      "visual_metaphor": "A friendly robot chef with many buttons on its belly. When you press a specific button (like 'make a sandwich'), the robot whirs, lights flash, and out comes a delicious sandwich. Each button is like a command that tells the robot what special task to do.",
+      "question_text": "Did you understand this concept?",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    },
+    {
+      "id": 3,
+      "image_path": "images/page3_1766178885673.png",
+      "image_prompt": "A funny cartoon scene: A cheerful banana, wearing a miniature yellow hard hat and holding a tiny toy hammer, is struggling but determined to assemble a large, colorful, and complex toy castle. The banana is on a workbench with scattered toy pieces. The style is cute, simple, and vibrant, suitable for young children aged 5-8.",
+      "hint_text": "Funny picture of a banana",
+      "visual_metaphor": "A banana wearing a tiny hard hat and holding a little hammer, diligently trying to assemble a complicated toy.",
+      "question_text": "Did you understand this concept?",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    },
+    {
+      "id": 4,
+      "image_path": "images/page4_1766178885673.png",
+      "image_prompt": "A cute, cartoon chef character with a chef's hat and apron is inside a bright, colorful kitchen. The chef is holding an open recipe book. In the background, there's a pantry with labeled shelves (representing storage) and various cooking utensils and appliances (representing CPU/RAM). The chef is actively preparing a delicious-looking meal on a counter. A friendly customer character is sitting at a small table, smiling and waiting for their food. The scene should feel busy but organized and cheerful.",
+      "hint_text": "What did we learn",
+      "visual_metaphor": "A friendly, anthropomorphic computer character is like a chef in a busy kitchen. The chef has a recipe book (the program/software). When a customer (you) orders something (input), the chef reads the recipe, gathers ingredients from the pantry (storage), and uses their cooking tools (CPU/RAM) to prepare the dish (output). The completed dish is then served to the customer.",
+      "question_text": "Did you understand this concept?",
+      "question_type": "yesno",
+      "choice_labels": [
+        "Yes",
+        "No"
+      ],
+      "correct_answer_is_yes": true
+    }
+  ],
+  "generation": {
+    "source": "ai",
+    "grounded_facts": [
+      "teamwork",
+      "problem-solving",
+      "computer basics",
+      "following instructions"
+    ],
+    "source_urls": [],
+    "timestamp": "2025-12-19T21:14:48.845Z"
+  },
+  "critic_review": {
+    "approved": true,
+    "warnings": [],
+    "readabilityScore": 85
+  }
+}

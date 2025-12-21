@@ -11,7 +11,13 @@
       "Bash(npx tsc:*)",
       "Bash(findstr:*)",
       "Bash(npx openspec:*)",
-      "Bash(love . --test)"
+      "Bash(love . --test)",
+      "WebSearch",
+      "WebFetch(domain:google.github.io)",
+      "WebFetch(domain:ai.google.dev)",
+      "Skill(openspec:proposal)",
+      "WebFetch(domain:github.com)",
+      "Skill(openspec:apply)"
     ]
   },
   "spinnerTipsEnabled": true

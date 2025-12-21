@@ -5,6 +5,7 @@ local gamestate = require("gamestate")
 local logic = require("logic")
 local renderer = require("renderer")
 local editor = require("editor")
+local wizard = require("wizard")
 
 -- New UI system modules
 local Tokens = require("ui.tokens")
@@ -16,6 +17,15 @@ local Decorations = require("ui.decorations")
 
 local APP_MODE = "create"
 local errorMessage = nil
+
+-- Check for --ai flag in command line arguments
+local AUTO_AI_WIZARD = false
+for i, v in ipairs(arg or {}) do
+    if v == "--ai" then
+        AUTO_AI_WIZARD = true
+        break
+    end
+end
 
 -- Preview canvas for config mode (renders PlayScreen at virtual resolution)
 local previewCanvas = nil
@@ -47,7 +57,7 @@ function love.load()
 
     -- Initialize game systems
     gamestate.init()
-    editor.init()
+    editor.init({ autoAiWizard = AUTO_AI_WIZARD })
     PlayScreen.init()
 
     -- Set up play screen callbacks
@@ -102,6 +112,7 @@ function love.update(dt)
     if APP_MODE == "create" then
         Slab.Update(dt)
         editor.update(dt)
+        wizard.update(dt)  -- Update wizard thread polling
     else
         -- Update play screen
         PlayScreen.update(dt, gamestate)
@@ -138,12 +149,19 @@ function drawCreateMode()
 
     -- Draw the center preview panel (on top, but uses layout positioning)
     drawCenterPreview()
+
+    -- Draw modal dialogs on top of EVERYTHING (highest z-index)
+    editor.drawModalDialogs()
+
+    -- Draw wizard on top of everything (highest z-index)
+    wizard.draw()
 end
 
--- Center preview panel - renders PlayScreen to canvas with disabled buttons
+-- Center preview panel - shows the story/page image prominently
 function drawCenterPreview()
     local layout = Layout.getConfigLayout()
     local panel = layout.previewPanel
+    local ImageCard = require("components.image_card")
 
     local previewX = panel.x
     local previewY = panel.y
@@ -154,13 +172,27 @@ function drawCenterPreview()
     love.graphics.setColor(Tokens.COLORS.panel_dark_transparent)
     love.graphics.rectangle("fill", previewX, previewY, previewW, previewH, 8)
 
+    -- Determine what to show: cover or page image
+    local story = editor.getStory()
+    local page = editor.getCurrentPage()
+    local imagePath = nil
+    local label = "Image Preview"
+
+    if page then
+        imagePath = page.image_path
+        label = "Page Image"
+    elseif story and story.cover_image_path and story.cover_image_path ~= "" then
+        imagePath = story.cover_image_path
+        label = "Cover Image"
+    end
+
     -- Draw header bar
     love.graphics.setColor(0.15, 0.15, 0.20, 0.95)
     love.graphics.rectangle("fill", previewX, previewY, previewW, 30, 8)
 
     -- Preview label
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print("Preview (Play Mode)", previewX + 15, previewY + 7)
+    love.graphics.print(label, previewX + 15, previewY + 7)
 
     -- Draw subtle border
     love.graphics.setColor(0.35, 0.35, 0.40, 0.8)
@@ -168,42 +200,48 @@ function drawCenterPreview()
     love.graphics.rectangle("line", previewX, previewY, previewW, previewH, 8)
     love.graphics.setLineWidth(1)
 
-    -- Render PlayScreen to canvas in preview mode
-    love.graphics.setCanvas(previewCanvas)
-    love.graphics.clear(0, 0, 0, 1)
-
-    local page = editor.getCurrentPage()
-    if page then
-        -- Draw PlayScreen with previewMode = true (buttons disabled)
-        PlayScreen.draw(previewGamestate, nil, true)
-    else
-        love.graphics.setColor(Tokens.COLORS.background)
-        love.graphics.rectangle("fill", 0, 0, Tokens.VIRTUAL_WIDTH, Tokens.VIRTUAL_HEIGHT)
-        love.graphics.setColor(0.5, 0.5, 0.5)
-        love.graphics.print("No page selected", 350, 280)
-    end
-
-    love.graphics.setCanvas()
-
-    -- Calculate scale and position to fit canvas in preview area
+    -- Calculate content area for image
     local contentX = previewX + panel.padding
     local contentY = previewY + 40
     local contentW = previewW - panel.padding * 2
     local contentH = previewH - 50
 
-    -- Calculate scale to fit 800x600 canvas
-    local scaleX = contentW / Tokens.VIRTUAL_WIDTH
-    local scaleY = contentH / Tokens.VIRTUAL_HEIGHT
-    local scale = math.min(scaleX, scaleY) * 0.95  -- 95% to leave margin
+    -- Load and draw the image
+    local image = nil
+    if imagePath and imagePath ~= "" then
+        image = ImageCard.loadImage(imagePath)
+    end
 
-    local scaledW = Tokens.VIRTUAL_WIDTH * scale
-    local scaledH = Tokens.VIRTUAL_HEIGHT * scale
-    local offsetX = (contentW - scaledW) / 2
-    local offsetY = (contentH - scaledH) / 2
+    if image then
+        -- Calculate scale to fit image in content area while maintaining aspect ratio
+        local imgW, imgH = image:getDimensions()
+        local scaleX = contentW / imgW
+        local scaleY = contentH / imgH
+        local scale = math.min(scaleX, scaleY) * 0.95  -- 95% to leave margin
 
-    -- Draw the canvas
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(previewCanvas, contentX + offsetX, contentY + offsetY, 0, scale, scale)
+        local drawW = imgW * scale
+        local drawH = imgH * scale
+        local drawX = contentX + (contentW - drawW) / 2
+        local drawY = contentY + (contentH - drawH) / 2
+
+        -- Draw image background/frame
+        love.graphics.setColor(0.1, 0.1, 0.12, 1)
+        love.graphics.rectangle("fill", drawX - 4, drawY - 4, drawW + 8, drawH + 8, 4)
+
+        -- Draw the image
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.draw(image, math.floor(drawX), math.floor(drawY), 0, scale, scale)
+    else
+        -- No image placeholder
+        love.graphics.setColor(0.2, 0.2, 0.25, 1)
+        love.graphics.rectangle("fill", contentX, contentY, contentW, contentH, 4)
+
+        love.graphics.setColor(0.5, 0.5, 0.55, 1)
+        local text = imagePath and imagePath ~= "" and "Loading image..." or "No image"
+        local font = love.graphics.getFont()
+        local textW = font:getWidth(text)
+        love.graphics.print(text, contentX + (contentW - textW) / 2, contentY + contentH / 2 - 10)
+    end
 end
 
 function drawPlayMode()
@@ -260,6 +298,15 @@ function love.mousepressed(x, y, button)
     if button ~= 1 then return end
 
     if APP_MODE == "create" then
+        -- Handle wizard clicks first (highest priority, blocks all other input)
+        if wizard.isOpen() then
+            wizard.handleMouseClick(x, y)
+            return
+        end
+        -- Handle dialog clicks first (highest priority)
+        if editor.handleLoadSavedDialogClick(x, y) then
+            return
+        end
         -- Handle custom thumbnail panel clicks (before Slab processes)
         if editor.handleThumbnailClick(x, y) then
             return
@@ -303,7 +350,19 @@ function love.mousepressed(x, y, button)
 end
 
 function love.keypressed(key)
+    -- Handle wizard keyboard input first (if open)
+    if APP_MODE == "create" and wizard.isOpen() then
+        if wizard.keypressed(key) then
+            return
+        end
+    end
+
     if key == "tab" then
+        -- Don't switch modes while wizard is open
+        if wizard.isOpen() then
+            return
+        end
+
         if APP_MODE == "create" then
             APP_MODE = "play"
             -- Clear Slab's focused input to prevent it from capturing keystrokes in play mode
@@ -351,6 +410,10 @@ end
 
 function love.textinput(text)
     if APP_MODE == "create" then
+        -- Handle wizard text input first (if open)
+        if wizard.isOpen() and wizard.textinput(text) then
+            return
+        end
         editor.textinput(text)
     else
         local page = gamestate.getCurrentPage()

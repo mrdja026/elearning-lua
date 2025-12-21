@@ -1,22 +1,29 @@
-Kucanje ne radi kako valja
-Rutiranje izmedju strana ne radi kako treba
-Test Story Created: stories/test_all_question_types.json
+# Tech Debt
 
-- Page 1 - Binary question: "Is 5 greater than 3?" (Yes/No)
-- Page 2 - Text question: "What is the capital of France?" (Answer: Paris)
-- Page 3 - Multi-question: Three math/trivia questions with error feedback
+## Known Issues
 
-Change Archived: 2025-12-12-add-flexible-question-types
+### Download requires elevated privileges (Windows)
+- curl fallback for HTTPS downloads needs admin privileges on Windows
+- Investigate: temp file permissions, or use a different temp directory
+- Consider: bundle LuaSec with the app
 
-- 7 requirements added to specs
-- 2 requirements modified
-- Specs updated: creator-studio, logic-engine
+### Critique agent status unknown
+- We don't know if the critique agent in the backend works
+- Needs testing and verification
 
-● Bash(cd "C:\Users\Mrdjan\Documents\workspace\eai-learning" && openspec list)
-⎿  No active changes found.
+## Future Improvements
 
-● No active changes remaining. OpenSpec is up to date.
+### Autosave after changes
+- Auto-save story to saves/ folder after edits
+- Debounce saves to avoid excessive writes
+- Show "unsaved changes" indicator
 
-To test later, run:
-love .
-Then load test_all_question_types.json from the Load dialog, or press Tab to play the default story and test the editor.
+### More automation scripts
+- Scripts to automate common tasks
+- Build/packaging scripts
+- Testing automation
+
+## Completed
+- [x] Wizard image downloads use curl fallback when LuaSec unavailable
+- [x] Stories save to source directory (not LÖVE save dir)
+- [x] Downloads go to images/ in source directory

@@ -286,12 +286,13 @@ function PlayScreen.drawStoryContent(story, bounds, previewMode)
             w - innerOffset * 2, h - innerOffset * 2)
     end
 
-    -- Calculate image dimensions based on available space
+    -- Calculate image dimensions - use most of available space
     local padding = bounds and 15 or 40
-    local imgW = math.min(300, w - padding * 2)
-    local imgH = math.min(200, h * 0.4)
-    local imgX = x + (w - imgW) / 2
-    local imgY = y + (bounds and 40 or 120)
+    local titleSpace = 100  -- Space for title and topic at bottom
+    local imgW = w - padding * 2
+    local imgH = h - padding - titleSpace
+    local imgX = x + padding
+    local imgY = y + padding
 
     -- Cover image
     local coverImage = nil
@@ -324,8 +325,8 @@ function PlayScreen.drawStoryContent(story, bounds, previewMode)
         love.graphics.print(placeholder, imgX + (imgW - placeholderW) / 2, imgY + imgH / 2 - 8)
     end
 
-    -- Story title
-    local titleY = imgY + imgH + (bounds and 15 or 40)
+    -- Story title (below image)
+    local titleY = imgY + imgH + 15
     love.graphics.setColor(1, 1, 1, 1)
     local title = story.title or "Untitled Story"
     local font = love.graphics.getFont()
@@ -334,7 +335,7 @@ function PlayScreen.drawStoryContent(story, bounds, previewMode)
 
     -- Topic/description
     if story.topic and story.topic ~= "" then
-        local topicY = titleY + 25
+        local topicY = titleY + 22
         love.graphics.setColor(0.7, 0.7, 0.8, 1)
         local topicW = font:getWidth(story.topic)
         love.graphics.print(story.topic, x + (w - topicW) / 2, topicY)
@@ -363,11 +364,11 @@ function PlayScreen.drawLeftPanel(panel, imageCard, page)
         image = ImageCard.loadImage(page.image_path)
     end
 
-    -- Center image card in panel
-    local cardW = math.min(imageCard.maxWidth, panel.contentWidth)
-    local cardH = math.min(imageCard.maxHeight, panel.contentHeight - Tokens.SPACING.lg)
-    local cardX = panel.contentX + (panel.contentWidth - cardW) / 2
-    local cardY = panel.contentY + (panel.contentHeight - cardH) / 2
+    -- Use full content area for image
+    local cardW = panel.contentWidth
+    local cardH = panel.contentHeight
+    local cardX = panel.contentX
+    local cardY = panel.contentY
 
     ImageCard.draw(cardX, cardY, cardW, cardH, image)
 end

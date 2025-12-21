@@ -5,8 +5,11 @@ import { logger } from 'hono/logger';
 import 'dotenv/config';
 
 import { generateImageRoute } from './routes/generate-image.js';
+import { generateStoryRoute } from './routes/generate-story.js';
 import { testRoutes } from './routes/test-routes.js';
 import { storiesRoute } from './routes/stories.js';
+import { wizardRoutes } from './routes/wizard-routes.js';
+import { flowTestRoutes } from './routes/flow-test-routes.js';
 
 const app = new Hono();
 
@@ -18,8 +21,11 @@ app.get('/', (c) => {
 });
 
 app.route('/api', generateImageRoute);
+app.route('/api', generateStoryRoute);
 app.route('/api', testRoutes);
 app.route('/api', storiesRoute);
+app.route('/api/story-wizard', wizardRoutes);
+app.route('/api/flow-test', flowTestRoutes);
 
 const port = parseInt(process.env.PORT || '3000');
 
@@ -35,6 +41,11 @@ console.log(`  STABILITY_API_KEY: ${process.env.STABILITY_API_KEY ? '✓ Set (' 
 console.log(`  CLOUDINARY_CLOUD_NAME: ${process.env.CLOUDINARY_CLOUD_NAME ? '✓ Set' : '✗ MISSING'}`);
 console.log(`  CLOUDINARY_API_KEY: ${process.env.CLOUDINARY_API_KEY ? '✓ Set' : '✗ MISSING'}`);
 console.log(`  CLOUDINARY_API_SECRET: ${process.env.CLOUDINARY_API_SECRET ? '✓ Set' : '✗ MISSING'}`);
+console.log('');
+console.log('ADK + Cache Status:');
+const hasRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
+console.log(`  UPSTASH_REDIS: ${hasRedis ? '✓ Configured' : '○ Not set (using in-memory cache)'}`);
+console.log(`  @google/adk: ✓ Loaded`);
 console.log('============================================\n');
 
 serve({
